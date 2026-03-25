@@ -21,7 +21,7 @@ export class GitHubNotifier implements Notifier {
     async notify(data: NotificationData): Promise<void> {
         const {passed, failed, broken, skipped, unknown} = data.resultStatus;
 
-        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" alt="Allure">`;
+        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="16" height="16" alt="Allure" style="vertical-align: middle;">`;
         let message = "";
         if (data.reportUrl) {
             message += `${logo} **Test Report**: [${data.reportUrl}](${data.reportUrl})\n`;
