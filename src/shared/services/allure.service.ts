@@ -1,6 +1,8 @@
 import {CommandRunner} from "../interfaces/command.interface.js";
-// @ts-expect-error allure-commandline has no type definitions
-import allureCommandline from "allure-commandline";
+import {createRequire} from "node:module";
+
+const require = createRequire(import.meta.url);
+const allureCommandline = require("allure-commandline");
 
 export class AllureService implements CommandRunner {
     runCommand(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {

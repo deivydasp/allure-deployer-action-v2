@@ -1,5 +1,6 @@
-// @ts-expect-error allure-commandline has no type definitions
-import allureCommandline from "allure-commandline";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const allureCommandline = require("allure-commandline");
 export class AllureService {
     runCommand(args) {
         const allureProcess = allureCommandline(args);
