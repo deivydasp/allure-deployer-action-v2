@@ -116,7 +116,19 @@ export class ArtifactService {
     }
     async upload(filePath, destination) {
         const files = getAbsoluteFilePaths(filePath);
-        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
-        await withRetry(work, DEFAULT_RETRY_CONFIG);
+        const originalWrite = process.stdout.write.bind(process.stdout);
+        const noisyPatterns = /Artifact name is valid|Root directory input is valid|Beginning upload|Uploaded bytes|Finished uploading|SHA256|Finalizing artifact/;
+        process.stdout.write = ((chunk, ...args) => {
+            if (typeof chunk === 'string' && noisyPatterns.test(chunk))
+                return true;
+            return originalWrite(chunk, ...args);
+        });
+        try {
+            const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
+            await withRetry(work, DEFAULT_RETRY_CONFIG);
+        }
+        finally {
+            process.stdout.write = originalWrite;
+        }
     }
 }

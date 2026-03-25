@@ -166,8 +166,18 @@ export class ArtifactService implements StorageProvider {
 
     async upload(filePath: string, destination: string): Promise<void> {
         const files = getAbsoluteFilePaths(filePath)
-        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath)
-        await withRetry(work, DEFAULT_RETRY_CONFIG)
+        const originalWrite = process.stdout.write.bind(process.stdout);
+        const noisyPatterns = /Artifact name is valid|Root directory input is valid|Beginning upload|Uploaded bytes|Finished uploading|SHA256|Finalizing artifact/;
+        process.stdout.write = ((chunk: any, ...args: any[]) => {
+            if (typeof chunk === 'string' && noisyPatterns.test(chunk)) return true;
+            return originalWrite(chunk, ...args);
+        }) as any;
+        try {
+            const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath)
+            await withRetry(work, DEFAULT_RETRY_CONFIG)
+        } finally {
+            process.stdout.write = originalWrite;
+        }
     }
 
 }
