@@ -22,12 +22,6 @@ inputs:
   report_name:
     description: "Title of your report"
     required: false
-  slack_channel:
-    description: "Slack channel ID for notifications (optional)"
-    required: false
-  slack_token:
-    description: "Slack Token"
-    required: false
   allure_results_path:
     description: "A path/to/results or comma separate paths (path/to/results1,path/to/results2) of Allure results."
     required: true

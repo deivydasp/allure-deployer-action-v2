@@ -3,8 +3,6 @@ export interface Inputs {
     github_pages_branch?: string;
     github_pages_repo: string;
     report_name?: string;
-    slack_channel: string;
-    slack_token: string;
     allure_results_path: string;
     show_history: boolean;
     pr_comment: boolean;

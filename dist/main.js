@@ -11,8 +11,8 @@ import inputs from './io.js';
 import { ArtifactService } from './services/artifact.service.js';
 import { GithubPagesService } from './services/github-pages.service.js';
 import { GitHubService } from './services/github.service.js';
-import { Allure, ConsoleNotifier, copyFiles, getReportStats, NotifyHandler, SlackNotifier, SlackService, validateResultsPaths, } from './shared/index.js';
-import { copyDirectory, validateSlackConfig } from './utilities/util.js';
+import { Allure, ConsoleNotifier, copyFiles, getReportStats, NotifyHandler, validateResultsPaths, } from './shared/index.js';
+import { copyDirectory } from './utilities/util.js';
 export async function main() {
     await executeDeployment();
 }
@@ -175,12 +175,6 @@ async function copyReportToCustomDir(reportDir) {
 }
 async function sendNotifications(resultStatus, reportUrl, environment) {
     const notifiers = [new ConsoleNotifier()];
-    const channel = inputs.slack_channel;
-    const slackToken = inputs.slack_token;
-    if (validateSlackConfig(channel, slackToken)) {
-        const slackClient = new SlackService({ channel, token: slackToken });
-        notifiers.push(new SlackNotifier(slackClient));
-    }
     const token = inputs.github_token;
     const prNumber = github.context.payload.pull_request?.number;
     const prComment = inputs.pr_comment;

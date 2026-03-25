@@ -40,10 +40,6 @@ on:
       branch:
         description: 'GitHub pages deployment branch'
         default: 'gh-pages'
-      slack:
-        description: "Send slack message"
-        type: boolean
-        default: false
 
 jobs:
   gh:
@@ -63,8 +59,6 @@ jobs:
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
-          slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
-          slack_token: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_TOKEN || '' }}
 
   gh-multi:
     if: ${{ github.event.inputs.job == 'gh-multi' }}
@@ -83,8 +77,6 @@ jobs:
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
-          slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
-          slack_token: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_TOKEN || '' }}
 
       - name: Deploy Reports to GitHub Pages 2
         uses: ./
@@ -95,8 +87,6 @@ jobs:
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
-          slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
-          slack_token: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_TOKEN || '' }}
 
   gh-no-backup:
     if: ${{ github.event.inputs.job == 'gh-no-backup' }}
@@ -114,5 +104,3 @@ jobs:
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
-          slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
-          slack_token: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_TOKEN || '' }}

@@ -24,11 +24,9 @@ import {
     Notifier,
     NotifyHandler,
     ReportStatistic,
-    SlackNotifier,
-    SlackService,
     validateResultsPaths,
 } from './shared/index.js';
-import { copyDirectory, validateSlackConfig } from './utilities/util.js';
+import { copyDirectory } from './utilities/util.js';
 
 export async function main() {
     await executeDeployment();
@@ -246,14 +244,6 @@ async function copyReportToCustomDir(reportDir: string): Promise<void> {
 
 async function sendNotifications(resultStatus: ReportStatistic, reportUrl?: string, environment?: Map<string, string>) {
     const notifiers: Notifier[] = [new ConsoleNotifier()];
-    const channel = inputs.slack_channel;
-    const slackToken = inputs.slack_token;
-
-    if (validateSlackConfig(channel, slackToken)) {
-        const slackClient = new SlackService({ channel, token: slackToken });
-        notifiers.push(new SlackNotifier(slackClient));
-    }
-
     const token = inputs.github_token;
     const prNumber = github.context.payload.pull_request?.number;
     const prComment = inputs.pr_comment;

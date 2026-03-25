@@ -1,25 +1,12 @@
 import { info, warning } from '@actions/core';
 import * as fs from 'fs/promises';
 import path from 'node:path';
-import { SlackConfig } from '../shared/interfaces/slack.interface.js';
 
 export const ERROR_MESSAGES = {
     EMPTY_RESULTS: 'Error: The specified results directory is empty.',
     NO_RESULTS_DIR: 'Error: No Allure result files in the specified directory.',
-    INVALID_SLACK_CRED: `Invalid Slack credential. 'slack_channel' and 'slack_token' must be provided together`,
     NO_JAVA: 'Error: JAVA_HOME not found. Allure 2.32 requires JAVA runtime installed',
 };
-
-export function validateSlackConfig(channel: string, token: string): SlackConfig | undefined {
-    // Check if only one of the variables is provided
-    if ((channel && !token) || (!channel && token)) {
-        warning(ERROR_MESSAGES.INVALID_SLACK_CRED);
-    }
-    if (channel && token) {
-        return { channel, token };
-    }
-    return undefined;
-}
 
 /**
  * Configuration for retry logic

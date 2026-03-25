@@ -26,8 +26,6 @@ const inputs: Inputs & DefaultConfig = {
     github_pages_branch: getInputOrUndefined('github_pages_branch'),
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
-    slack_channel: getTypedInput('slack_channel'),
-    slack_token: getTypedInput('slack_token'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     prefix: prefix(),
     fileProcessingConcurrency: 10,
