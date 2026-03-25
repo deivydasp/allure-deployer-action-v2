@@ -1,12 +1,12 @@
-import {Order, StorageProvider} from "../shared/index.js";
-import {DefaultArtifactClient} from '@actions/artifact'
-import pLimit from "p-limit";
-import {DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry} from "../utilities/util.js";
-import {Octokit} from "@octokit/rest";
+import { Order, StorageProvider } from '../shared/index.js';
+import { DefaultArtifactClient } from '@actions/artifact';
+import pLimit from 'p-limit';
+import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from '../utilities/util.js';
+import { Octokit } from '@octokit/rest';
 import https from 'https';
-import fs from "fs";
-import path from "node:path";
-import * as github from "@actions/github";
+import fs from 'fs';
+import path from 'node:path';
+import * as github from '@actions/github';
 
 export interface WorkflowRun {
     id?: number;
@@ -45,9 +45,9 @@ export class ArtifactService implements StorageProvider {
     repo: string;
     token: string;
 
-    constructor({token, repo, owner}: ArtifactServiceConfig) {
+    constructor({ token, repo, owner }: ArtifactServiceConfig) {
         this.artifactClient = new DefaultArtifactClient();
-        this.octokit = new Octokit({auth: token, baseUrl: github.context.apiUrl});
+        this.octokit = new Octokit({ auth: token, baseUrl: github.context.apiUrl });
         this.owner = owner;
         this.repo = repo;
         this.token = token;
@@ -55,8 +55,8 @@ export class ArtifactService implements StorageProvider {
 
     async hasArtifactReadPermission(): Promise<boolean> {
         try {
-            await this.getFiles({maxResults: 1})
-            return true
+            await this.getFiles({ maxResults: 1 });
+            return true;
         } catch (_e) {
             return false;
         }
@@ -69,10 +69,10 @@ export class ArtifactService implements StorageProvider {
                 repo: this.repo,
                 artifact_id: id,
                 headers: {
-                    'X-GitHub-Api-Version': '2022-11-28'
-                }
-            })
-        }
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+            });
+        };
         await withRetry(operation, DEFAULT_RETRY_CONFIG);
     }
 
@@ -80,59 +80,84 @@ export class ArtifactService implements StorageProvider {
         throw new Error('Not implemented');
     }
 
-    async download({destination, concurrency = 5, files}: {
+    async download({
+        destination,
+        concurrency = 5,
+        files,
+    }: {
         destination: string;
         concurrency?: number;
-        files: ArtifactResponse[]
+        files: ArtifactResponse[];
     }): Promise<string[]> {
-
         const limit = pLimit(concurrency);
         const promises: Promise<string>[] = [];
         for (const file of files) {
-            promises.push(limit(async (): Promise<string> => {
-                const filePath = path.join(destination, `${file.id}.zip`);
-                return new Promise(async (resolve, reject) => {
-                    try {
-                        const operation = async () => {
-                            return await this.octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
+            promises.push(
+                limit(async (): Promise<string> => {
+                    const filePath = path.join(destination, `${file.id}.zip`);
+                    const operation = async () => {
+                        return await this.octokit.request(
+                            'GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}',
+                            {
                                 owner: this.owner,
                                 repo: this.repo,
                                 artifact_id: file.id,
                                 archive_format: 'zip',
                                 headers: {
-                                    'X-GitHub-Api-Version': '2022-11-28'
-                                }
-                            })
-                        }
-                        const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG)
-                        if (!urlResponse) {
-                            reject(urlResponse)
-                        } else {
-                            const artifactUrl = urlResponse.url
-                            https.get(artifactUrl, (response) => {
+                                    'X-GitHub-Api-Version': '2022-11-28',
+                                },
+                            },
+                        );
+                    };
+                    const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG);
+                    if (!urlResponse) {
+                        throw new Error(
+                            `Failed to retrieve artifact download URL. Response: ${JSON.stringify(urlResponse)}`,
+                        );
+                    }
+                    const artifactUrl = urlResponse.url;
+                    return new Promise((resolve, reject) => {
+                        https
+                            .get(artifactUrl, (response) => {
                                 if (response.statusCode !== 200) {
-                                    reject(`Failed to get '${artifactUrl}' (${response.statusCode}) ${response.statusMessage}`);
+                                    response.resume();
+                                    reject(
+                                        new Error(
+                                            `Failed to get '${artifactUrl}' (${response.statusCode}) ${response.statusMessage}`,
+                                        ),
+                                    );
+                                    return;
                                 }
                                 const fileStream = fs.createWriteStream(filePath);
-                                response.pipe(fileStream);
+                                response.on('error', (err) => {
+                                    fileStream.destroy();
+                                    fs.unlink(filePath, () => reject(err));
+                                });
+                                fileStream.on('error', (err) => {
+                                    response.destroy();
+                                    fs.unlink(filePath, () => reject(err));
+                                });
                                 fileStream.on('finish', () => {
                                     fileStream.close();
                                     resolve(filePath);
                                 });
-                            }).on('error', (err) => {
-                                fs.unlink(filePath, () => reject(err)); // Delete the file if an error occurs
+                                response.pipe(fileStream);
+                            })
+                            .on('error', (err) => {
+                                fs.unlink(filePath, () => reject(err));
                             });
-                        }
-                    } catch (e) {
-                        reject(e)
-                    }
-                });
-            }))
+                    });
+                }),
+            );
         }
-        return await allFulfilledResults(promises)
+        return await allFulfilledResults(promises);
     }
 
-    async getFiles({matchGlob, order = Order.byOldestToNewest, maxResults}: {
+    async getFiles({
+        matchGlob,
+        order = Order.byOldestToNewest,
+        maxResults,
+    }: {
         matchGlob?: string;
         order?: Order;
         maxResults?: number;
@@ -144,13 +169,13 @@ export class ArtifactService implements StorageProvider {
                 name: matchGlob,
                 per_page: maxResults,
                 headers: {
-                    'X-GitHub-Api-Version': '2022-11-28'
-                }
-            })
-        }
-        const response = await withRetry(operation, DEFAULT_RETRY_CONFIG)
-        const files = response.data.artifacts.filter(file => file.created_at && !file.expired);
-        return this.sortFiles(files, order)
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+            });
+        };
+        const response = await withRetry(operation, DEFAULT_RETRY_CONFIG);
+        const files = response.data.artifacts.filter((file) => file.created_at && !file.expired);
+        return this.sortFiles(files, order);
     }
 
     sortFiles(files: ArtifactResponse[], order: Order): ArtifactResponse[] {
@@ -165,19 +190,8 @@ export class ArtifactService implements StorageProvider {
     }
 
     async upload(filePath: string, destination: string): Promise<void> {
-        const files = getAbsoluteFilePaths(filePath)
-        const originalWrite = process.stdout.write.bind(process.stdout);
-        const noisyPatterns = /Artifact name is valid|Root directory input is valid|Beginning upload|Uploaded bytes|Finished uploading|SHA256|Finalizing artifact/;
-        process.stdout.write = ((chunk: any, ...args: any[]) => {
-            if (typeof chunk === 'string' && noisyPatterns.test(chunk)) return true;
-            return originalWrite(chunk, ...args);
-        }) as any;
-        try {
-            const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath)
-            await withRetry(work, DEFAULT_RETRY_CONFIG)
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        const files = await getAbsoluteFilePaths(filePath);
+        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
+        await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
-
 }

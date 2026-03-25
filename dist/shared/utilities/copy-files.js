@@ -1,7 +1,7 @@
-import path from "node:path";
-import fs from "fs/promises";
-import pLimit from "p-limit";
-export async function copyFiles({ from, to, concurrency = 10, overwrite = false }) {
+import path from 'node:path';
+import fs from 'fs/promises';
+import pLimit from 'p-limit';
+export async function copyFiles({ from, to, concurrency = 10, overwrite = false, }) {
     const limit = pLimit(concurrency);
     const copyPromises = [];
     let successCount = 0;
@@ -14,9 +14,9 @@ export async function copyFiles({ from, to, concurrency = 10, overwrite = false 
                     continue;
                 copyPromises.push(limit(async () => {
                     try {
-                        const fileToCopy = path.posix.join(dir, file.name);
-                        const destination = path.posix.join(to, file.name);
-                        await fs.cp(fileToCopy, destination, { force: overwrite, errorOnExist: false });
+                        const fileToCopy = path.join(dir, file.name);
+                        const destination = path.join(to, file.name);
+                        await fs.cp(fileToCopy, destination, { force: overwrite, errorOnExist: !overwrite });
                         successCount++;
                     }
                     catch (error) {

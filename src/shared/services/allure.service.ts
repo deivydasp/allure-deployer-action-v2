@@ -1,8 +1,8 @@
-import {CommandRunner} from "../interfaces/command.interface.js";
-import {createRequire} from "node:module";
+import { CommandRunner } from '../interfaces/command.interface.js';
+import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const allureCommandline = require("allure-commandline");
+const allureCommandline = require('allure-commandline');
 
 export class AllureService implements CommandRunner {
     runCommand(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -21,7 +21,7 @@ export class AllureService implements CommandRunner {
                 reject(error);
             });
             allureProcess.on('exit', (exitCode: number) => {
-                resolve({exitCode, stdout, stderr});
+                resolve({ exitCode, stdout, stderr });
             });
         });
     }

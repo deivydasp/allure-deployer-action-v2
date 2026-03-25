@@ -1,12 +1,12 @@
-import { Order } from "../shared/index.js";
+import { Order } from '../shared/index.js';
 import { DefaultArtifactClient } from '@actions/artifact';
-import pLimit from "p-limit";
-import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from "../utilities/util.js";
-import { Octokit } from "@octokit/rest";
+import pLimit from 'p-limit';
+import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from '../utilities/util.js';
+import { Octokit } from '@octokit/rest';
 import https from 'https';
-import fs from "fs";
-import path from "node:path";
-import * as github from "@actions/github";
+import fs from 'fs';
+import path from 'node:path';
+import * as github from '@actions/github';
 export class ArtifactService {
     constructor({ token, repo, owner }) {
         this.artifactClient = new DefaultArtifactClient();
@@ -31,8 +31,8 @@ export class ArtifactService {
                 repo: this.repo,
                 artifact_id: id,
                 headers: {
-                    'X-GitHub-Api-Version': '2022-11-28'
-                }
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
             });
         };
         await withRetry(operation, DEFAULT_RETRY_CONFIG);
@@ -40,55 +40,60 @@ export class ArtifactService {
     deleteFiles(_matchGlob) {
         throw new Error('Not implemented');
     }
-    async download({ destination, concurrency = 5, files }) {
+    async download({ destination, concurrency = 5, files, }) {
         const limit = pLimit(concurrency);
         const promises = [];
         for (const file of files) {
             promises.push(limit(async () => {
                 const filePath = path.join(destination, `${file.id}.zip`);
-                return new Promise(async (resolve, reject) => {
-                    try {
-                        const operation = async () => {
-                            return await this.octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
-                                owner: this.owner,
-                                repo: this.repo,
-                                artifact_id: file.id,
-                                archive_format: 'zip',
-                                headers: {
-                                    'X-GitHub-Api-Version': '2022-11-28'
-                                }
-                            });
-                        };
-                        const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG);
-                        if (!urlResponse) {
-                            reject(urlResponse);
+                const operation = async () => {
+                    return await this.octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
+                        owner: this.owner,
+                        repo: this.repo,
+                        artifact_id: file.id,
+                        archive_format: 'zip',
+                        headers: {
+                            'X-GitHub-Api-Version': '2022-11-28',
+                        },
+                    });
+                };
+                const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG);
+                if (!urlResponse) {
+                    throw new Error(`Failed to retrieve artifact download URL. Response: ${JSON.stringify(urlResponse)}`);
+                }
+                const artifactUrl = urlResponse.url;
+                return new Promise((resolve, reject) => {
+                    https
+                        .get(artifactUrl, (response) => {
+                        if (response.statusCode !== 200) {
+                            response.resume();
+                            reject(new Error(`Failed to get '${artifactUrl}' (${response.statusCode}) ${response.statusMessage}`));
+                            return;
                         }
-                        else {
-                            const artifactUrl = urlResponse.url;
-                            https.get(artifactUrl, (response) => {
-                                if (response.statusCode !== 200) {
-                                    reject(`Failed to get '${artifactUrl}' (${response.statusCode}) ${response.statusMessage}`);
-                                }
-                                const fileStream = fs.createWriteStream(filePath);
-                                response.pipe(fileStream);
-                                fileStream.on('finish', () => {
-                                    fileStream.close();
-                                    resolve(filePath);
-                                });
-                            }).on('error', (err) => {
-                                fs.unlink(filePath, () => reject(err)); // Delete the file if an error occurs
-                            });
-                        }
-                    }
-                    catch (e) {
-                        reject(e);
-                    }
+                        const fileStream = fs.createWriteStream(filePath);
+                        response.on('error', (err) => {
+                            fileStream.destroy();
+                            fs.unlink(filePath, () => reject(err));
+                        });
+                        fileStream.on('error', (err) => {
+                            response.destroy();
+                            fs.unlink(filePath, () => reject(err));
+                        });
+                        fileStream.on('finish', () => {
+                            fileStream.close();
+                            resolve(filePath);
+                        });
+                        response.pipe(fileStream);
+                    })
+                        .on('error', (err) => {
+                        fs.unlink(filePath, () => reject(err));
+                    });
                 });
             }));
         }
         return await allFulfilledResults(promises);
     }
-    async getFiles({ matchGlob, order = Order.byOldestToNewest, maxResults }) {
+    async getFiles({ matchGlob, order = Order.byOldestToNewest, maxResults, }) {
         const operation = async () => {
             return await this.octokit.request('GET /repos/{owner}/{repo}/actions/artifacts', {
                 owner: this.owner,
@@ -96,12 +101,12 @@ export class ArtifactService {
                 name: matchGlob,
                 per_page: maxResults,
                 headers: {
-                    'X-GitHub-Api-Version': '2022-11-28'
-                }
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
             });
         };
         const response = await withRetry(operation, DEFAULT_RETRY_CONFIG);
-        const files = response.data.artifacts.filter(file => file.created_at && !file.expired);
+        const files = response.data.artifacts.filter((file) => file.created_at && !file.expired);
         return this.sortFiles(files, order);
     }
     sortFiles(files, order) {
@@ -115,20 +120,8 @@ export class ArtifactService {
         });
     }
     async upload(filePath, destination) {
-        const files = getAbsoluteFilePaths(filePath);
-        const originalWrite = process.stdout.write.bind(process.stdout);
-        const noisyPatterns = /Artifact name is valid|Root directory input is valid|Beginning upload|Uploaded bytes|Finished uploading|SHA256|Finalizing artifact/;
-        process.stdout.write = ((chunk, ...args) => {
-            if (typeof chunk === 'string' && noisyPatterns.test(chunk))
-                return true;
-            return originalWrite(chunk, ...args);
-        });
-        try {
-            const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
-            await withRetry(work, DEFAULT_RETRY_CONFIG);
-        }
-        finally {
-            process.stdout.write = originalWrite;
-        }
+        const files = await getAbsoluteFilePaths(filePath);
+        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
+        await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
 }

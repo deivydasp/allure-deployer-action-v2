@@ -1,5 +1,5 @@
-import {SlackConfig, SlackInterface} from "../interfaces/slack.interface.js";
-import {Block, KnownBlock, WebClient} from "@slack/web-api";
+import { SlackConfig, SlackInterface } from '../interfaces/slack.interface.js';
+import { Block, KnownBlock, WebClient } from '@slack/web-api';
 
 export class SlackService implements SlackInterface {
     webClient: WebClient;

@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
-import * as path from "node:path";
-import { AllureService } from "../services/allure.service.js";
-import { propertiesReader } from "properties-reader";
+import * as path from 'node:path';
+import { propertiesReader } from 'properties-reader';
+import { AllureService } from '../services/allure.service.js';
 export class Allure {
     constructor({ allureRunner, config }) {
         this.allureRunner = allureRunner ?? new AllureService();
@@ -11,7 +11,7 @@ export class Allure {
         const map = new Map();
         try {
             const properties = propertiesReader({
-                sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties')
+                sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
             console.log('Environments');
             for (const [key, value] of properties.entries()) {
@@ -20,15 +20,20 @@ export class Allure {
             }
             return map;
         }
-        catch (_e) {
-            // environment.properties file does not exist
+        catch (e) {
+            if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+                // environment.properties file does not exist
+            }
+            else {
+                throw e;
+            }
         }
         return undefined;
     }
     async generate(executor) {
         if (executor) {
             const executorPath = path.join(this.config.RESULTS_STAGING_PATH, 'executor.json');
-            await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { mode: 0o755, encoding: 'utf8' });
+            await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
         const command = [
             'generate',
@@ -42,7 +47,7 @@ export class Allure {
         }
         const { exitCode } = await this.allureRunner.runCommand(command);
         if (exitCode !== 0) {
-            throw new Error("Failed to generate Allure report");
+            throw new Error('Failed to generate Allure report');
         }
         return this.config.REPORTS_DIR;
     }

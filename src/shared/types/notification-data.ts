@@ -1,4 +1,4 @@
-import {ReportStatistic} from "./report-statistic.js";
+import { ReportStatistic } from './report-statistic.js';
 
 export interface NotificationData {
     resultStatus: ReportStatistic;
