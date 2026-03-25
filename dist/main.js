@@ -60,6 +60,8 @@ async function executeDeployment() {
         const pageUrl = normalizeUrl(`${data.html_url}/${reportSubDir}`);
         const host = getGitHubHost({
             token,
+            owner,
+            repo,
             pageUrl,
             reportDir,
             pagesSourcePath,
@@ -67,8 +69,7 @@ async function executeDeployment() {
         });
         await mkdir(reportDir, { recursive: true, mode: 0o755 });
         const resultPaths = await validateResultsPaths(inputs.allure_results_path);
-        const storageRequired = inputs.show_history || inputs.retries > 0;
-        const storage = storageRequired ? await initializeStorage(reportDir, resultPaths) : undefined;
+        const storage = inputs.show_history ? await initializeStorage(owner, repo, reportDir) : undefined;
         const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
         const config = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
@@ -85,9 +86,8 @@ async function executeDeployment() {
         process.exit(1);
     }
 }
-function getGitHubHost({ token, reportDir, workspace, pageUrl, pagesSourcePath, }) {
+function getGitHubHost({ token, owner, repo, reportDir, workspace, pageUrl, pagesSourcePath, }) {
     const branch = inputs.github_pages_branch;
-    const [owner, repo] = inputs.github_pages_repo.split('/');
     const config = {
         owner,
         repo,
@@ -100,8 +100,7 @@ function getGitHubHost({ token, reportDir, workspace, pageUrl, pagesSourcePath, 
     };
     return new GithubHost(new GithubPagesService(config));
 }
-async function initializeStorage(reportDir, RESULTS_PATHS) {
-    const [owner, repo] = inputs.github_pages_repo.split('/');
+async function initializeStorage(owner, repo, reportDir) {
     const config = {
         owner,
         repo,
@@ -111,17 +110,15 @@ async function initializeStorage(reportDir, RESULTS_PATHS) {
     if (await service.hasArtifactReadPermission()) {
         const storageConfig = {
             ARCHIVE_DIR: inputs.ARCHIVE_DIR,
-            RESULTS_PATHS,
             REPORTS_DIR: reportDir,
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
             showHistory: inputs.show_history,
-            retries: inputs.retries,
             clean: false,
         };
         return new GithubStorage(service, storageConfig);
     }
-    warning("GitHub token does not have 'actions: write' permission to access GitHub Artifacts. History and Retries will not be included in test reports");
+    warning("GitHub token does not have 'actions: write' permission to access GitHub Artifacts. History will not be included in test reports");
     return undefined;
 }
 async function stageDeployment({ storage, host, RESULTS_PATHS, }) {
@@ -134,7 +131,7 @@ async function stageDeployment({ storage, host, RESULTS_PATHS, }) {
     //run sequentially to avoid memory spikes
     const result = await host.init();
     await copyResultsFiles;
-    if (inputs.show_history || inputs.retries > 0) {
+    if (inputs.show_history) {
         await storage?.stageFilesFromStorage();
     }
     info('Files staged successfully.');

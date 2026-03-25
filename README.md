@@ -1,6 +1,6 @@
 # Allure Deployer Action
 
-Deploy Allure test reports to GitHub Pages with History, Retries, Report Aggregation, and Slack integration.
+Deploy Allure test reports to GitHub Pages with History, Report Aggregation, and Slack integration.
 
 **Supported Runners:**
 - `ubuntu-latest`
@@ -21,12 +21,11 @@ jobs:
       - uses: actions/checkout@v6
       - name: Run test
         run: #Run test and create allure results
-      - name: Deploy Reports to GitHub Pages with History and Retries
+      - name: Deploy Reports to GitHub Pages with History
         uses: deivydasp/allure-deployer-action@v2
         with:
           allure_results_path: 'allure-results'
           show_history: 'true'
-          retries: 5
 ```
 
 ---
@@ -54,7 +53,6 @@ jobs:
           pr_comment: 'true'
           allure_results_path: 'allure-results'
           show_history: 'true'
-          retries: 5
 ```
 
 PR comment example:
@@ -85,7 +83,6 @@ PR comment example:
 | `github_pages_branch` | Branch used for GitHub Pages deployments.                                                      | `gh-pages`          | No       |
 | `github_pages_repo`   | GitHub repository to deploy GitHub Pages to. Format: `owner/repo`.                             | `github.repository` | No       |
 | `show_history`        | Display history from previous runs.                                                            | `true`              | No       |
-| `retries`             | Number of previous runs to display as retries.                                                 | `0`                 | No       |
 | `report_name`         | Custom name/title for the report.                                                              | —                   | No       |
 | `language`            | Allure report language.                                                                        | `en`                | No       |
 | `custom_report_dir`   | Directory to copy the generated report into, for use in subsequent workflow steps.              | —                   | No       |
@@ -105,7 +102,7 @@ PR comment example:
 ## Setup Notes
 
 - **GitHub Pages:**
-  - `github_token` must have `contents: write` (to push report files) and `actions: write` (to back up History/Retries as GitHub Artifacts).
+  - `github_token` must have `contents: write` (to push report files) and `actions: write` (to back up History as GitHub Artifacts).
   - GitHub Pages must be configured to deploy from the `github_pages_branch` (default: `gh-pages`).
 - **Pull Request Comments:**
   - `github_token` must have `pull_requests: write` and `issues: write`.

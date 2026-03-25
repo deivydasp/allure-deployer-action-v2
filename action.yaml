@@ -1,5 +1,5 @@
 name: "Allure Deployer Action"
-description: "Deploy Allure reports to GitHub Pages with History, Retries, Aggregation and Slack integration"
+description: "Deploy Allure reports to GitHub Pages with History, Aggregation and Slack integration"
 author: "Deivydas Piliukaitis"
 
 branding:
@@ -31,9 +31,6 @@ inputs:
   allure_results_path:
     description: "A path/to/results or comma separate paths (path/to/results1,path/to/results2) of Allure results."
     required: true
-  retries:
-    description: "Number of previous test runs to show as retries in new test report (Default 0)"
-    default: '0'
   show_history:
     description: "Show history in the test report (true/false)"
     default: "true"

@@ -14,4 +14,3 @@ jobs:
           allure_results_path: 'allure-results'
           prefix: 'my-project'
           show_history: 'true'
-          retries: 5

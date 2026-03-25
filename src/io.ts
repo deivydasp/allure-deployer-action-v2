@@ -21,7 +21,6 @@ const inputs: Inputs & DefaultConfig = {
     report_name: getInputOrUndefined('report_name'),
     custom_report_dir: getInput('report_dir') || getInputOrUndefined('custom_report_dir'),
     allure_results_path: getTypedInput('allure_results_path', true),
-    retries: Number(getTypedInput('retries')),
     show_history: getBooleanInput('show_history'),
     github_token: getTypedInput('github_token', true),
     github_pages_branch: getInputOrUndefined('github_pages_branch'),

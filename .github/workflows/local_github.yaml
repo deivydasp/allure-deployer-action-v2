@@ -18,10 +18,6 @@ on:
           - macos-latest
           - windows-latest
         default: ubuntu-latest
-      retries:
-        description: 'Number of test runs to show as retries in report'
-        type: number
-        default: 10
       show-history:
         description: 'Show history in report'
         type: boolean
@@ -58,14 +54,13 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v6
-      - name: Deploy Reports to GitHub Pages with History and Retries
+      - name: Deploy Reports to GitHub Pages with History
         uses: ./
         with:
           github_pages_branch: ${{ github.event.inputs.branch }}
           prefix: ${{ github.event.inputs.prefix || '' }}
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
-          retries: ${{ github.event.inputs.retries }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
           slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
@@ -86,7 +81,6 @@ jobs:
           prefix: ${{ github.event.inputs.prefix || '' }}
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
-          retries: ${{ github.event.inputs.retries }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
           slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
@@ -99,7 +93,6 @@ jobs:
           prefix: ${{ github.event.inputs.prefix || '' }}
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
-          retries: ${{ github.event.inputs.retries }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
           slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}
@@ -119,7 +112,6 @@ jobs:
           github_pages_branch: ${{ github.event.inputs.branch }}
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
-          retries: ${{ github.event.inputs.retries }}
           report_name: ${{ github.event.inputs.report-name }}
           language: ${{ github.event.inputs.report-lang }}
           slack_channel: ${{ github.event.inputs.slack == 'true' && secrets.SLACK_CHANNEL || '' }}

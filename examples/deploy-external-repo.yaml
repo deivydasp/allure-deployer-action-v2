@@ -12,4 +12,3 @@ jobs:
           github_pages_repo: 'another-owner/another-repo'
           github_token: ${{ secrets.TOKEN_WITH_PERMISSION_TO_ANOTHER_REPO }}
           show_history: 'true'
-          retries: 5

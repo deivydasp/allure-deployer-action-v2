@@ -2,9 +2,6 @@ name: Test Actions
 on:
   workflow_dispatch:
     inputs:
-      retries:
-        description: 'Number of test runs to show as retries in report'
-        default: '10'
       show-history:
         description: 'Show history in report'
         type: boolean
@@ -30,11 +27,10 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v6
-      - name: Deploy Reports to GitHub Pages with History and Retries
+      - name: Deploy Reports to GitHub Pages with History
         uses: deivydasp/allure-deployer-action@v2
         with:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
-          retries: ${{ github.event.inputs.retries }}
           prefix: 'examples-gh-pages'
           language: ${{ github.event.inputs.report-lang }}

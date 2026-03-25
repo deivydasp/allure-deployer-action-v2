@@ -3,7 +3,6 @@ import path from 'node:path';
 import fs from 'fs/promises';
 import pLimit from 'p-limit';
 import { ArtifactService } from '../services/artifact.service.js';
-import * as os from 'node:os';
 import fsSync from 'fs';
 import unzipper, { Entry } from 'unzipper';
 import { RequestError } from '@octokit/request-error';
@@ -15,8 +14,6 @@ export interface GithubStorageConfig {
     fileProcessingConcurrency: number;
     clean: boolean;
     showHistory: boolean;
-    retries: number;
-    RESULTS_PATHS: string[];
     RESULTS_STAGING_PATH: string;
     ARCHIVE_DIR: string;
     REPORTS_DIR: string;
@@ -24,26 +21,19 @@ export interface GithubStorageConfig {
 
 export class GithubStorage implements IStorage {
     private readonly HISTORY_ARCHIVE_NAME: string;
-    private readonly RESULTS_ARCHIVE_NAME: string;
 
     constructor(
         private readonly provider: ArtifactService,
         readonly args: GithubStorageConfig,
     ) {
         this.HISTORY_ARCHIVE_NAME = inputs.prefix ? `${inputs.prefix}-last-history` : 'last-history';
-        this.RESULTS_ARCHIVE_NAME = inputs.prefix ? `${inputs.prefix}-allure-results` : 'allure-results';
     }
 
     async stageFilesFromStorage(): Promise<void> {
         await this.createStagingDirectories();
-        const tasks: Promise<void>[] = [];
         if (this.args.showHistory) {
-            tasks.push(this.stageHistoryFiles());
+            await this.stageHistoryFiles();
         }
-        if (this.args.retries > 0) {
-            tasks.push(this.stageResultFiles(this.args.retries));
-        }
-        await allFulfilledResults(tasks);
     }
 
     unzipToStaging(zipFilePath: string, outputDir: string): Promise<boolean> {
@@ -86,14 +76,9 @@ export class GithubStorage implements IStorage {
     }
 
     async uploadArtifacts(): Promise<void> {
-        const promises: Promise<void>[] = [];
         if (this.args.showHistory) {
-            promises.push(this.uploadHistory());
+            await this.uploadHistory();
         }
-        if (this.args.retries > 0) {
-            promises.push(this.uploadNewResults());
-        }
-        await allFulfilledResults(promises);
     }
 
     // ============= Private Helper Methods =============
@@ -159,81 +144,10 @@ export class GithubStorage implements IStorage {
     }
 
     /**
-     * Stages the result files and deletes older files exceeding the retry limit.
-     * @param retries - Maximum number of files to keep.
-     */
-    private async stageResultFiles(retries: number): Promise<void> {
-        const files = await this.provider.getFiles({
-            order: Order.byOldestToNewest,
-            matchGlob: this.RESULTS_ARCHIVE_NAME,
-            maxResults: retries,
-        });
-        if (files.length === 0) return;
-
-        const limit = pLimit(this.args.fileProcessingConcurrency);
-
-        // Best-effort deletion of old files
-        if (files.length > retries) {
-            const deleteTasks: Promise<void>[] = [];
-            const filesToDelete = files.slice(0, files.length - retries);
-            for (const file of filesToDelete) {
-                deleteTasks.push(
-                    limit(async () => {
-                        try {
-                            await this.provider.deleteFile(file.id);
-                        } catch (error) {
-                            if (error instanceof RequestError && error.status === 403) {
-                                warning(
-                                    `Failed to delete outdated Allure Result files. Ensure that GitHub token has 'actions: write' permission`,
-                                );
-                            } else {
-                                console.warn('Delete file error:', error);
-                            }
-                        }
-                    }),
-                );
-            }
-            await allFulfilledResults(deleteTasks);
-        }
-
-        // Download and unzip must succeed
-        const downloadedPaths = await this.provider.download({
-            files,
-            destination: this.args.ARCHIVE_DIR,
-        });
-
-        const unzipTasks: Promise<void>[] = [];
-        for (const filePath of downloadedPaths) {
-            unzipTasks.push(
-                limit(async () => {
-                    await this.unzipToStaging(filePath, this.args.RESULTS_STAGING_PATH);
-                }),
-            );
-        }
-        await Promise.all(unzipTasks);
-    }
-
-    /**
      * Returns the path for the history folder.
      */
     private getHistoryFolder(): string {
         return path.join(this.args.REPORTS_DIR, 'history');
-    }
-
-    /**
-     * Zips and uploads new results to the remote storage.
-     *
-     */
-    private async uploadNewResults(): Promise<void> {
-        let resultPath: string;
-        if (this.args.RESULTS_PATHS.length == 1) {
-            resultPath = this.args.RESULTS_PATHS[0];
-        } else {
-            resultPath = path.join(os.tmpdir(), 'allure-deployer-results-temp');
-            // Copy result files from multiple result directories to a temporary directory for upload
-            await this.copyResultFiles({ from: this.args.RESULTS_PATHS, to: resultPath });
-        }
-        await this.provider.upload(resultPath, this.RESULTS_ARCHIVE_NAME);
     }
 
     /**
@@ -243,57 +157,4 @@ export class GithubStorage implements IStorage {
         await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
     }
 
-    private async copyResultFiles({
-        from,
-        to,
-        concurrency = 10,
-        overwrite = false,
-        exclude = ['executor.json', 'environment.properties'],
-    }: {
-        from: string[]; // array of result directories
-        to: string;
-        concurrency?: number;
-        overwrite?: boolean;
-        exclude?: string[];
-    }): Promise<number> {
-        const limit = pLimit(concurrency); // Limit concurrency
-        const copyPromises = [];
-        let successCount = 0;
-
-        // Ensure the destination directory exists
-        await fs.mkdir(to, { recursive: true });
-
-        // Iterate over each directory in the `from` array
-        for (const dir of from) {
-            try {
-                // Get the list of files from the current directory
-                const directoryEntries = await fs.readdir(dir, { withFileTypes: true });
-
-                for (const file of directoryEntries) {
-                    // Skip directories in Allure Result path, process files only
-                    if (!file.isFile()) continue;
-                    // Skip excluded files
-                    if (exclude.includes(path.basename(file.name))) continue;
-
-                    copyPromises.push(
-                        limit(async () => {
-                            try {
-                                const fileToCopy = path.join(dir, file.name);
-                                const destination = path.join(to, file.name);
-                                await fs.cp(fileToCopy, destination, { force: overwrite, errorOnExist: false });
-                                successCount++;
-                            } catch (error) {
-                                console.log(`Error copying file ${file.name} from ${dir}:`, error);
-                            }
-                        }),
-                    );
-                }
-            } catch (error) {
-                console.log(`Error reading directory: ${dir}`, error);
-            }
-        }
-
-        await Promise.all(copyPromises); // Wait for all copy operations to complete
-        return successCount;
-    }
 }

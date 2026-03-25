@@ -6,7 +6,6 @@ export interface Inputs {
     slack_channel: string;
     slack_token: string;
     allure_results_path: string;
-    retries: number;
     show_history: boolean;
     pr_comment: boolean;
     custom_report_dir?: string;

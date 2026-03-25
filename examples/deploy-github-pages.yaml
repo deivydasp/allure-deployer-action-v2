@@ -8,9 +8,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Run test
         run: #Run test and create allure results
-      - name: Deploy Reports to GitHub Pages with History and Retries
+      - name: Deploy Reports to GitHub Pages with History
         uses: deivydasp/allure-deployer-action@v2
         with:
           allure_results_path: 'allure-results'
           show_history: 'true'
-          retries: 5

@@ -13,4 +13,3 @@ jobs:
         with:
           allure_results_path: 'allure-results_1,allure-results_2,allure-results_3'
           show_history: 'true'
-          retries: 5
