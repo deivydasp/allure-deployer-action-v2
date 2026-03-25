@@ -1,9 +1,8 @@
-import { endGroup, error, info, startGroup, warning } from '@actions/core';
+import { endGroup, error, info, setFailed, startGroup, warning } from '@actions/core';
 import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
 import { mkdir } from 'fs/promises';
 import path from 'node:path';
-import * as process from 'node:process';
 import normalizeUrl from 'normalize-url';
 import { GithubStorage, GithubStorageConfig } from './features/github-storage.js';
 import { GithubHost } from './features/hosting/github.host.js';
@@ -39,14 +38,12 @@ async function executeDeployment() {
     try {
         const token = inputs.github_token;
         if (!token) {
-            error("Github Pages require a valid 'github_token'");
-            process.exit(1);
+            throw new Error("Github Pages require a valid 'github_token'");
         }
 
         const repoParts = inputs.github_pages_repo!.split('/');
         if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
-            error(`Invalid github_pages_repo format. Expected 'owner/repo', got '${inputs.github_pages_repo}'`);
-            process.exit(1);
+            throw new Error(`Invalid github_pages_repo format. Expected 'owner/repo', got '${inputs.github_pages_repo}'`);
         }
         const [owner, repo] = repoParts;
         const { data } = await github
@@ -57,11 +54,9 @@ async function executeDeployment() {
             })
             .catch((e: any) => {
                 if (e instanceof RequestError) {
-                    error(e.message);
-                } else {
-                    console.error(e);
+                    throw new Error(e.message);
                 }
-                process.exit(1);
+                throw e;
             });
 
         if (data.build_type !== 'legacy' || data.source?.branch !== inputs.github_pages_branch) {
@@ -69,7 +64,7 @@ async function executeDeployment() {
             error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
             error(`${github.context.serverUrl}/${inputs.github_pages_repo}/settings/pages`);
             endGroup();
-            process.exit(1);
+            throw new Error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
         }
         const pagesSourcePath = data.source!.path.startsWith('/') ? data.source!.path.slice(1) : data.source!.path;
 
@@ -102,9 +97,8 @@ async function executeDeployment() {
         await generateAllureReport({ allure, reportUrl });
         const [resultsStats] = await finalizeDeployment({ host, storage, reportDir });
         await sendNotifications(resultsStats, reportUrl, allure.environments);
-    } catch (error) {
-        console.error('Deployment failed:', error);
-        process.exit(1);
+    } catch (e) {
+        setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
     }
 }
 

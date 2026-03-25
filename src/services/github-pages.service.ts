@@ -3,7 +3,7 @@ import path from 'node:path';
 import simpleGit, { CheckRepoActions, SimpleGit } from 'simple-git';
 import { context } from '@actions/github';
 import pLimit from 'p-limit';
-import { error, info } from '@actions/core';
+import { info } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
 import { GithubPagesInterface } from '../interfaces/github-pages.interface.js';
@@ -46,8 +46,7 @@ export class GithubPagesService implements GithubPagesInterface {
         await this.ensureValidState();
 
         if (!fs.existsSync(path.join(this.reportDir, 'index.html'))) {
-            error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
-            process.exit(1);
+            throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
         }
         await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
 
