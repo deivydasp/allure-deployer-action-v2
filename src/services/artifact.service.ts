@@ -1,4 +1,4 @@
-import { Order, StorageProvider } from '../shared/index.js';
+import { Order, StorageFile, StorageProvider } from '../shared/index.js';
 import { DefaultArtifactClient } from '@actions/artifact';
 import pLimit from 'p-limit';
 import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from '../utilities/util.js';
@@ -16,15 +16,12 @@ export interface WorkflowRun {
     head_sha: string;
 }
 
-export interface ArtifactResponse {
-    id: number;
+export interface ArtifactResponse extends StorageFile {
     node_id: string;
-    name: string;
     size_in_bytes: number;
     url: string;
     archive_download_url: string;
     expired: boolean;
-    created_at: string | null;
     expires_at: string | null;
     updated_at: string | null;
     workflow_run?: WorkflowRun | object | null;
@@ -37,8 +34,6 @@ export interface ArtifactServiceConfig {
 }
 
 export class ArtifactService implements StorageProvider {
-    bucket: any;
-    prefix: string | undefined;
     artifactClient: DefaultArtifactClient;
     octokit: Octokit;
     owner: string;

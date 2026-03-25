@@ -1,7 +1,9 @@
+import type { Block, KnownBlock, WebClient } from '@slack/web-api';
+
 export interface SlackInterface {
-    webClient: any;
+    webClient: WebClient;
     channel: string;
-    postMessage(blocks: any[], text: string): Promise<void>;
+    postMessage(blocks: (Block | KnownBlock)[], text: string): Promise<void>;
 }
 
 export interface SlackConfig {

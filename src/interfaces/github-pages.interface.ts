@@ -3,5 +3,5 @@ export interface GithubPagesInterface {
     owner: string;
     repo: string;
     deployPages(): Promise<void>;
-    setupBranch(): Promise<any>;
+    setupBranch(): Promise<string>;
 }

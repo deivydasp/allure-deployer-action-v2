@@ -1,7 +1,7 @@
 // Interfaces
 export { HostingProvider } from './interfaces/hosting-provider.interface.js';
 export { IStorage } from './interfaces/storage.interface.js';
-export { StorageProvider, Order } from './interfaces/storage-provider.interface.js';
+export { StorageProvider, StorageFile, Order } from './interfaces/storage-provider.interface.js';
 export { Notifier } from './interfaces/notifier.interface.js';
 export { ExecutorInterface } from './interfaces/executor.interface.js';
 export { CommandRunner } from './interfaces/command.interface.js';
