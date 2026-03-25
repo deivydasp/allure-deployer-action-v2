@@ -3,7 +3,7 @@ import path from 'node:path';
 import simpleGit, { CheckRepoActions } from 'simple-git';
 import { context } from '@actions/github';
 import pLimit from 'p-limit';
-import { info } from '@actions/core';
+import { info, warning } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
 import { allFulfilledResults, removeTrailingSlash, withRetry } from '../utilities/util.js';
@@ -29,7 +29,7 @@ export class GithubPagesService {
         await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
         // Push with retry mechanism to handle concurrent updates
         await this.gitPushWithRetry();
-        console.log(`Allure report pages pushed to '${this.reportDir}' on '${this.branch}' branch`);
+        info(`Allure report pages pushed to '${this.reportDir}' on '${this.branch}' branch`);
     }
     /** Ensures the repository and required directories are set up */
     async ensureValidState() {
@@ -92,38 +92,33 @@ export class GithubPagesService {
     /** Deletes old Allure reports, keeping the latest `inputs.keep` */
     async deleteOldReports() {
         try {
-            const parentDIr = path.dirname(this.reportDir);
-            const entries = await fs.promises.readdir(parentDIr, { withFileTypes: true });
-            const limit = pLimit(10);
-            let paths = (await allFulfilledResults(entries.map((entry) => limit(async () => {
-                const reportIndexHtmlPath = path.join(entry.parentPath, entry.name, 'index.html');
-                if (entry.isDirectory() && fs.existsSync(reportIndexHtmlPath)) {
-                    return path.dirname(reportIndexHtmlPath); // Return directory name of index.html
+            const parentDir = path.dirname(this.reportDir);
+            const entries = await fs.promises.readdir(parentDir, { withFileTypes: true });
+            // Single pass: filter report directories and collect mtime
+            const reports = [];
+            for (const entry of entries) {
+                if (!entry.isDirectory())
+                    continue;
+                const dirPath = path.join(entry.parentPath, entry.name);
+                if (fs.existsSync(path.join(dirPath, 'index.html'))) {
+                    const stats = await fs.promises.stat(dirPath);
+                    reports.push({ dir: dirPath, mtimeMs: stats.mtimeMs });
                 }
-                return undefined;
-            })))).filter(Boolean);
-            if (paths.length > 1 && paths.length >= inputs.keep) {
-                paths = await this.sortPathsByModifiedTime(paths);
-                const pathsToDelete = paths.slice(0, paths.length - inputs.keep);
-                await allFulfilledResults(pathsToDelete.map((pathToDelete) => limit(async () => {
-                    await fs.promises.rm(pathToDelete, { recursive: true, force: true });
-                    info(`Old Report deleted from '${pathToDelete}'`);
+            }
+            if (reports.length > 1 && reports.length >= inputs.keep) {
+                reports.sort((a, b) => a.mtimeMs - b.mtimeMs);
+                const limit = pLimit(10);
+                const toDelete = reports.slice(0, reports.length - inputs.keep);
+                await allFulfilledResults(toDelete.map(({ dir }) => limit(async () => {
+                    await fs.promises.rm(dir, { recursive: true, force: true });
+                    info(`Old Report deleted from '${dir}'`);
                 })));
                 await this.git.add('-u');
             }
         }
         catch (e) {
-            console.warn('Failed to delete old reports:', e);
+            warning(`Failed to delete old reports: ${e}`);
         }
-    }
-    async sortPathsByModifiedTime(paths) {
-        const limit = pLimit(5);
-        const fileStats = await Promise.all(paths.map((file) => limit(async () => {
-            const stats = await fs.promises.stat(file);
-            return { file, mtimeMs: stats.mtimeMs };
-        })));
-        fileStats.sort((a, b) => a.mtimeMs - b.mtimeMs);
-        return fileStats.map((item) => item.file);
     }
     /** Creates a branch from the default branch if it doesn't exist */
     async createBranchFromDefault() {
@@ -132,7 +127,7 @@ export class GithubPagesService {
             .split('/')
             .pop();
         await this.git.checkoutBranch(this.branch, `origin/${defaultBranch}`);
-        console.log(`Branch '${this.branch}' created from '${defaultBranch}'.`);
+        info(`Branch '${this.branch}' created from '${defaultBranch}'.`);
     }
     /** Handles Git push with retry logic specifically for concurrent push scenarios */
     async gitPushWithRetry() {
@@ -142,16 +137,16 @@ export class GithubPagesService {
                 // Specify merge strategy to handle divergent branches
                 try {
                     await this.git.pull(['--no-rebase', 'origin', this.branch]);
-                    console.log('Successfully pulled remote changes');
+                    info('Successfully pulled remote changes');
                 }
                 catch (pullError) {
-                    console.warn(`Pull failed: ${pullError}. Will try direct push...`);
+                    warning(`Pull failed: ${pullError}. Will try direct push...`);
                 }
                 // Push to remote
                 await this.git.push('origin', this.branch);
             }
             catch (error) {
-                console.warn(`Push attempt failed: ${error.message}`);
+                warning(`Push attempt failed: ${error.message}`);
                 throw error; // Let the retry mechanism handle it
             }
         });

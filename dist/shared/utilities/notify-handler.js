@@ -1,3 +1,4 @@
+import { warning } from '@actions/core';
 export class NotifyHandler {
     constructor(notifiers) {
         this.notifiers = notifiers;
@@ -8,7 +9,7 @@ export class NotifyHandler {
                 await notifier.notify(data);
             }
             catch (e) {
-                console.warn(`${notifier.constructor.name} failed to send notification.`, e);
+                warning(`${notifier.constructor.name} failed to send notification. ${e}`);
             }
         });
         await Promise.all(promises);

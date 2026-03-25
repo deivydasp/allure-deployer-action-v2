@@ -1,4 +1,4 @@
-import { warning } from '@actions/core';
+import { info, warning } from '@actions/core';
 import * as fs from 'fs/promises';
 import path from 'node:path';
 export const ERROR_MESSAGES = {
@@ -66,7 +66,7 @@ export async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
             if (attempt === config.maxRetries) {
                 throw new Error(`Failed after ${config.maxRetries} attempts. Last error: ${error?.message || 'Unknown error'}`);
             }
-            console.warn(`Attempt ${attempt} failed. Retrying in ${delay}ms. Error: ${error.message}`);
+            warning(`Attempt ${attempt} failed. Retrying in ${delay}ms. Error: ${error.message}`);
             // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, delay));
             // Calculate next delay with exponential backoff
@@ -76,15 +76,14 @@ export async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
     throw new Error('Unreachable: withRetry loop completed without return or throw');
 }
 export async function getAbsoluteFilePaths(dir) {
-    const filesAndDirs = await fs.readdir(dir);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
     const filePaths = [];
-    for (const entry of filesAndDirs) {
-        const fullPath = path.resolve(dir, entry);
-        const stats = await fs.stat(fullPath);
-        if (stats.isDirectory()) {
+    for (const entry of entries) {
+        const fullPath = path.resolve(dir, entry.name);
+        if (entry.isDirectory()) {
             filePaths.push(...(await getAbsoluteFilePaths(fullPath)));
         }
-        else if (stats.isFile()) {
+        else if (entry.isFile()) {
             filePaths.push(fullPath);
         }
     }
@@ -92,7 +91,7 @@ export async function getAbsoluteFilePaths(dir) {
 }
 export async function copyDirectory(sourceDir, destDir) {
     await fs.cp(sourceDir, destDir, { recursive: true });
-    console.log(`Copied directory from ${sourceDir} to ${destDir}`);
+    info(`Copied directory from ${sourceDir} to ${destDir}`);
 }
 export async function allFulfilledResults(promises) {
     const results = await Promise.allSettled(promises);

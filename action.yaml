@@ -37,10 +37,6 @@ inputs:
   pr_comment:
     description: "Post test report information as pull request comment. Requires `github_token` to be set with permission"
     default: "true"
-  report_dir:
-    description: "A custom directory to generate Allure report into."
-    required: false
-    deprecationMessage: "Use 'custom_report_dir' instead."
   custom_report_dir:
     description: "A custom directory to generate Allure report into."
     required: false

@@ -1,3 +1,4 @@
+import { warning } from '@actions/core';
 import { NotificationData } from '../types/notification-data.js';
 import { Notifier } from '../interfaces/notifier.interface.js';
 
@@ -13,7 +14,7 @@ export class NotifyHandler {
             try {
                 await notifier.notify(data);
             } catch (e) {
-                console.warn(`${notifier.constructor.name} failed to send notification.`, e);
+                warning(`${notifier.constructor.name} failed to send notification. ${e}`);
             }
         });
         await Promise.all(promises);

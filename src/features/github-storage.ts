@@ -69,7 +69,7 @@ export class GithubStorage implements IStorage {
                     }
                 })
                 .on('error', (err) => {
-                    console.warn('Unzip file error');
+                    warning('Unzip file error');
                     reject(err);
                 });
         });
@@ -104,7 +104,7 @@ export class GithubStorage implements IStorage {
         });
 
         if (files.length === 0) {
-            console.warn('No history files found to stage.');
+            warning('No history files found to stage.');
             return;
         }
 
@@ -123,7 +123,7 @@ export class GithubStorage implements IStorage {
                                     `Failed to delete outdated Allure History file. Ensure that GitHub token has 'actions: write' permission`,
                                 );
                             } else {
-                                console.warn('Delete file error:', error);
+                                warning(`Delete file error: ${error}`);
                             }
                         }
                     }),

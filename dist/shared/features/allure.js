@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'node:path';
+import { info } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
 import { AllureService } from '../services/allure.service.js';
 export class Allure {
@@ -13,9 +14,9 @@ export class Allure {
             const properties = propertiesReader({
                 sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
-            console.log('Environments');
+            info('Environments');
             for (const [key, value] of properties.entries()) {
-                console.log(`${key}: ${value}`);
+                info(`${key}: ${value}`);
                 map.set(key, String(value));
             }
             return map;

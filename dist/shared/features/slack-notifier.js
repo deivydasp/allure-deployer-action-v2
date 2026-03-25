@@ -1,3 +1,4 @@
+import { info, error as logError } from '@actions/core';
 export class SlackNotifier {
     constructor(client) {
         this.slackClient = client;
@@ -56,10 +57,10 @@ export class SlackNotifier {
             blocks.push(this.buildButtonBlock('View report :bar_chart:', reportUrl));
         try {
             await this.slackClient.postMessage(blocks, 'Your test report is ready.');
-            console.log('Slack message sent');
+            info('Slack message sent');
         }
         catch (error) {
-            console.error('Error sending Slack message:', error);
+            logError(`Error sending Slack message: ${error}`);
         }
     }
 }

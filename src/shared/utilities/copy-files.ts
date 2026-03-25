@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'fs/promises';
+import { warning } from '@actions/core';
 import pLimit from 'p-limit';
 
 export async function copyFiles({
@@ -32,13 +33,13 @@ export async function copyFiles({
                             await fs.cp(fileToCopy, destination, { force: overwrite, errorOnExist: !overwrite });
                             successCount++;
                         } catch (error) {
-                            console.log(`Error copying file ${file.name} from ${dir}:`, error);
+                            warning(`Error copying file ${file.name} from ${dir}: ${error}`);
                         }
                     }),
                 );
             }
         } catch (error) {
-            console.log(`Error reading directory ${dir}:`, error);
+            warning(`Error reading directory ${dir}: ${error}`);
         }
     }
 

@@ -16,7 +16,7 @@ function getInputOrUndefined(name) {
 const inputs = {
     language: getTypedInput('language'),
     report_name: getInputOrUndefined('report_name'),
-    custom_report_dir: getInput('report_dir') || getInputOrUndefined('custom_report_dir'),
+    custom_report_dir: getInputOrUndefined('custom_report_dir'),
     allure_results_path: getTypedInput('allure_results_path', true),
     show_history: getBooleanInput('show_history'),
     github_token: getTypedInput('github_token', true),
@@ -36,9 +36,9 @@ function replaceWhiteSpace(s, replaceValue = '-') {
     return s.replace(/\s+/g, replaceValue);
 }
 function prefix() {
-    let prefix = getInput('gh_artifact_prefix');
+    let prefix = getInput('prefix');
     if (!prefix) {
-        prefix = getInput('prefix');
+        prefix = getInput('gh_artifact_prefix');
     }
     return prefix ? replaceWhiteSpace(prefix) : undefined;
 }

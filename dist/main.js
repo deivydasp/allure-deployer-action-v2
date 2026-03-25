@@ -170,7 +170,7 @@ async function copyReportToCustomDir(reportDir) {
             await copyDirectory(reportDir, inputs.custom_report_dir);
         }
         catch (e) {
-            console.error(e);
+            error(`${e}`);
         }
     }
 }

@@ -1,4 +1,4 @@
-import { warning } from '@actions/core';
+import { info, warning } from '@actions/core';
 import * as fs from 'fs/promises';
 import path from 'node:path';
 import { SlackConfig } from '../shared/interfaces/slack.interface.js';
@@ -92,7 +92,7 @@ export async function withRetry<T>(
                 );
             }
 
-            console.warn(`Attempt ${attempt} failed. Retrying in ${delay}ms. Error: ${error.message}`);
+            warning(`Attempt ${attempt} failed. Retrying in ${delay}ms. Error: ${error.message}`);
 
             // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, delay));
@@ -106,16 +106,14 @@ export async function withRetry<T>(
 }
 
 export async function getAbsoluteFilePaths(dir: string): Promise<string[]> {
-    const filesAndDirs = await fs.readdir(dir);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
     const filePaths: string[] = [];
 
-    for (const entry of filesAndDirs) {
-        const fullPath = path.resolve(dir, entry);
-        const stats = await fs.stat(fullPath);
-
-        if (stats.isDirectory()) {
+    for (const entry of entries) {
+        const fullPath = path.resolve(dir, entry.name);
+        if (entry.isDirectory()) {
             filePaths.push(...(await getAbsoluteFilePaths(fullPath)));
-        } else if (stats.isFile()) {
+        } else if (entry.isFile()) {
             filePaths.push(fullPath);
         }
     }
@@ -125,7 +123,7 @@ export async function getAbsoluteFilePaths(dir: string): Promise<string[]> {
 
 export async function copyDirectory(sourceDir: string, destDir: string): Promise<void> {
     await fs.cp(sourceDir, destDir, { recursive: true });
-    console.log(`Copied directory from ${sourceDir} to ${destDir}`);
+    info(`Copied directory from ${sourceDir} to ${destDir}`);
 }
 
 export async function allFulfilledResults<T>(promises: Promise<T>[]): Promise<T[]> {

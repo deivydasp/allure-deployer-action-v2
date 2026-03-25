@@ -1,5 +1,5 @@
 import * as github from '@actions/github';
-import { info, setOutput, summary } from '@actions/core';
+import { info, setOutput, summary, warning } from '@actions/core';
 import { DEFAULT_RETRY_CONFIG, withRetry } from '../utilities/util.js';
 export class GitHubService {
     async updateOutput({ name, value }) {
@@ -25,7 +25,7 @@ export class GitHubService {
             info(`Pull Request comment posted on PR #${prNumber}!`);
         }
         catch (e) {
-            console.warn('Failed to update PR:', e);
+            warning(`Failed to update PR: ${e}`);
         }
     }
     async updateSummary(message) {

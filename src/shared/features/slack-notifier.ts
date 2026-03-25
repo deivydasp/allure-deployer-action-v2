@@ -1,3 +1,4 @@
+import { info, error as logError } from '@actions/core';
 import { Notifier } from '../interfaces/notifier.interface.js';
 import { NotificationData } from '../types/notification-data.js';
 import { SlackInterface } from '../interfaces/slack.interface.js';
@@ -67,9 +68,9 @@ export class SlackNotifier implements Notifier {
 
         try {
             await this.slackClient.postMessage(blocks, 'Your test report is ready.');
-            console.log('Slack message sent');
+            info('Slack message sent');
         } catch (error) {
-            console.error('Error sending Slack message:', error);
+            logError(`Error sending Slack message: ${error}`);
         }
     }
 }
