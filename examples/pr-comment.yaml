@@ -1,0 +1,21 @@
+on:
+  pull_request:
+jobs:
+  allure-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test
+        run: #Run test and create allure results
+      - name: Deploy Reports to GitHub Pages on Pull Request
+        uses: deivydasp/allure-deployer-action@v2
+        with:
+          pr_comment: 'true'
+          allure_results_path: 'allure-results'
+          show_history: 'true'
+          retries: 5

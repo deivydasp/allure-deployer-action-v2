@@ -1,0 +1,17 @@
+node_modules/
+.idea
+.vscode
+allure-deployer-action.iml
+.env
+allure-report
+
+# Act
+*/act.secrets
+*/act.variables
+*/act.event.json
+
+*key.json
+*/coverage
+*/**/coverage
+act.secrets
+

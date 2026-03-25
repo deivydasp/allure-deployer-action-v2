@@ -1,0 +1,16 @@
+jobs:
+  aggregate-allure:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test in multi-module project
+        run: # Run test and create multiple allure results directories
+      - name: Deploy Aggregated Reports
+        uses: deivydasp/allure-deployer-action@v2
+        with:
+          allure_results_path: 'allure-results_1,allure-results_2,allure-results_3'
+          show_history: 'true'
+          retries: 5

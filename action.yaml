@@ -1,0 +1,67 @@
+name: "Allure Deployer Action"
+description: "Deploy Allure reports to GitHub Pages with History, Retries, Aggregation and Slack integration"
+author: "Deivydas Piliukaitis"
+
+branding:
+  icon: bar-chart
+  color: green
+
+runs:
+  using: 'node24'
+  main: "dist/main/index.js"
+  post: "dist/cleanup/index.js"
+
+inputs:
+  prefix:
+    description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
+    required: false
+  gh_artifact_prefix:
+    description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
+    required: false
+    deprecationMessage: "Use 'prefix' instead."
+  report_name:
+    description: "Title of your report"
+    required: false
+  slack_channel:
+    description: "Slack channel ID for notifications (optional)"
+    required: false
+  slack_token:
+    description: "Slack Token"
+    required: false
+  allure_results_path:
+    description: "A path/to/results or comma separate paths (path/to/results1,path/to/results2) of Allure results."
+    required: true
+  retries:
+    description: "Number of previous test runs to show as retries in new test report (Default 0)"
+    default: '0'
+  show_history:
+    description: "Show history in the test report (true/false)"
+    default: "true"
+  pr_comment:
+    description: "Post test report information as pull request comment. Requires `github_token` to be set with permission"
+    default: "true"
+  report_dir:
+    description: "A custom directory to generate Allure report into."
+    required: false
+    deprecationMessage: "Use 'custom_report_dir' instead."
+  custom_report_dir:
+    description: "A custom directory to generate Allure report into."
+    required: false
+  github_token:
+    description: "Auto-generated GITHUB_TOKEN or Personal Access Token for deploying report to GitHub pages and posting report info on pr_comment"
+    default: '${{ github.token }}'
+  github_pages_branch:
+    description: "Target branch for Deploying to GitHub Pages. Default: gh-pages"
+    default: 'gh-pages'
+  language:
+    description: "Allure report language"
+    default: 'en'
+  github_pages_repo:
+    description: "Another GitHub owner/repo to deploy GitHub pages. Ensure that 'github_token' provided has permissions to the repository"
+    default: '${{ github.repository }}'
+  keep:
+    description: "Number of test reports you want to keep alive"
+    default: '10'
+outputs:
+  report_url:
+    description: "URL to your test report"

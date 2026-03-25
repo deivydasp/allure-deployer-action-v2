@@ -1,0 +1,15 @@
+jobs:
+  deploy-external:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test
+        run: # Run test and create allure results
+      - name: Deploy Report to another GitHub repository
+        uses: deivydasp/allure-deployer-action@v2
+        with:
+          allure_results_path: 'allure-results'
+          github_pages_repo: 'another-owner/another-repo'
+          github_token: ${{ secrets.TOKEN_WITH_PERMISSION_TO_ANOTHER_REPO }}
+          show_history: 'true'
+          retries: 5
