@@ -1,4 +1,5 @@
 node_modules/
+!dist/main/node_modules/
 .idea
 .vscode
 allure-deployer-action.iml
