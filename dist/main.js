@@ -107,7 +107,6 @@ async function initializeStorage(owner, repo, reportDir) {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
             showHistory: inputs.show_history,
-            clean: false,
         };
         return new GithubStorage(service, storageConfig);
     }

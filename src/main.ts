@@ -151,7 +151,6 @@ async function initializeStorage(
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
             showHistory: inputs.show_history,
-            clean: false,
         };
         return new GithubStorage(service, storageConfig);
     }
@@ -225,7 +224,7 @@ async function finalizeDeployment({
     reportDir: string;
 }) {
     info('Finalizing deployment...');
-    const result: [ReportStatistic, any, void, void] = await Promise.all([
+    const result: [ReportStatistic, void, void, void] = await Promise.all([
         getReportStats(reportDir),
         host.deploy(),
         storage?.uploadArtifacts(),

@@ -12,7 +12,6 @@ import { allFulfilledResults } from '../utilities/util.js';
 
 export interface GithubStorageConfig {
     fileProcessingConcurrency: number;
-    clean: boolean;
     showHistory: boolean;
     RESULTS_STAGING_PATH: string;
     ARCHIVE_DIR: string;

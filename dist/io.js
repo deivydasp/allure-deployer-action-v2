@@ -25,7 +25,7 @@ const inputs = {
     pr_comment: getBooleanInput('pr_comment'),
     slack_channel: getTypedInput('slack_channel'),
     slack_token: getTypedInput('slack_token'),
-    keep: Number(getTypedInput('keep')),
+    keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     prefix: prefix(),
     fileProcessingConcurrency: 10,
     RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
