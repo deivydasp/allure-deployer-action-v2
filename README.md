@@ -18,7 +18,7 @@ jobs:
       contents: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run test
         run: #Run test and create allure results
       - name: Deploy Reports to GitHub Pages with History and Retries
@@ -45,7 +45,7 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run test
         run: #Run test and create allure results
       - name: Deploy Reports to GitHub Pages on Pull Request

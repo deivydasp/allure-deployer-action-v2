@@ -2,7 +2,7 @@ jobs:
   deploy-external:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run test
         run: # Run test and create allure results
       - name: Deploy Report to another GitHub repository

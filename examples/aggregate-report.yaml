@@ -5,7 +5,7 @@ jobs:
       contents: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run test in multi-module project
         run: # Run test and create multiple allure results directories
       - name: Deploy Aggregated Reports
