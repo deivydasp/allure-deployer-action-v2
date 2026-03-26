@@ -7,7 +7,7 @@ export class GitHubNotifier {
     }
     async notify(data) {
         const { passed, failed, broken, skipped, unknown } = data.resultStatus;
-        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="18" height="18" alt="Allure" align="absmiddle">`;
+        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" alt="Allure" align="absmiddle">`;
         let message = '';
         if (data.reportUrl) {
             message += `${logo} **Test Report**: [${data.reportUrl}](${data.reportUrl})\n`;
