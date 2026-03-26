@@ -1,5 +1,5 @@
 import { DefaultConfig, input, Inputs } from './interfaces/inputs.interface.js';
-import { getInput, getBooleanInput } from '@actions/core';
+import { getInput, getBooleanInput, setSecret } from '@actions/core';
 import path from 'node:path';
 import os from 'node:os';
 
@@ -33,6 +33,8 @@ const inputs: Inputs & DefaultConfig = {
     ARCHIVE_DIR: path.join(runtimeDir(), 'archive'),
     WORKSPACE: workspace(),
 };
+
+if (inputs.github_token) setSecret(inputs.github_token);
 
 function replaceWhiteSpace(s: string, replaceValue = '-'): string {
     return s.replace(/\s+/g, replaceValue);

@@ -2,17 +2,7 @@ node_modules/
 !dist/main/node_modules/
 .idea
 .vscode
-allure-deployer-action.iml
 .env
-allure-report
-
-# Act
-*/act.secrets
-*/act.variables
-*/act.event.json
-
+*.log
 *key.json
-*/coverage
-*/**/coverage
-act.secrets
-
+coverage/

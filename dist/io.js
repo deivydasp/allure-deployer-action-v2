@@ -1,4 +1,4 @@
-import { getInput, getBooleanInput } from '@actions/core';
+import { getInput, getBooleanInput, setSecret } from '@actions/core';
 import path from 'node:path';
 import os from 'node:os';
 function getTypedInput(name, required = false) {
@@ -30,6 +30,8 @@ const inputs = {
     ARCHIVE_DIR: path.join(runtimeDir(), 'archive'),
     WORKSPACE: workspace(),
 };
+if (inputs.github_token)
+    setSecret(inputs.github_token);
 function replaceWhiteSpace(s, replaceValue = '-') {
     return s.replace(/\s+/g, replaceValue);
 }
