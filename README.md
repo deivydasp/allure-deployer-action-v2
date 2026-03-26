@@ -1,6 +1,6 @@
 # Allure Deployer Action
 
-Deploy Allure test reports to GitHub Pages with History, Report Aggregation, and Slack integration.
+Deploy Allure test reports to GitHub Pages with History and Report Aggregation.
 
 **Supported Runners:**
 - `ubuntu-latest`
@@ -68,7 +68,6 @@ PR comment example:
 ## More examples
 
 - [Aggregate multiple Allure results](examples/aggregate-report.yaml)
-- [Deploy and notify in Slack](examples/deploy-slack.yaml)
 - [Deploy to another GitHub repository](examples/deploy-external-repo.yaml)
 - [Multi-project setup with prefix](examples/multi-projects-gh-pages.yaml)
 - [PR comment with report link](examples/pr-comment.yaml)
@@ -89,8 +88,6 @@ PR comment example:
 | `prefix`              | Prefix to uniquely identify test report artifacts when managing multiple projects.              | —                   | No       |
 | `keep`                | Number of test reports to keep alive.                                                          | `10`                | No       |
 | `pr_comment`          | Post report info as a PR comment. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
-| `slack_channel`       | Slack channel ID for report notifications.                                                     | —                   | No       |
-| `slack_token`         | Slack app token for sending notifications.                                                     | —                   | No       |
 
 ## Outputs
 
@@ -106,8 +103,6 @@ PR comment example:
   - GitHub Pages must be configured to deploy from the `github_pages_branch` (default: `gh-pages`).
 - **Pull Request Comments:**
   - `github_token` must have `pull_requests: write` and `issues: write`.
-- **Slack Integration:**
-  - Create a Slack app and generate a token. Provide both `slack_channel` and `slack_token`.
 
 ## Contributing and Licensing
 
