@@ -10,7 +10,7 @@ export class GitHubNotifier {
         const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" alt="Allure" align="top">`;
         let message = '';
         if (data.reportUrl) {
-            message += `${logo} **Test Report**: [${data.reportUrl}](${data.reportUrl})\n`;
+            message += `${logo}&nbsp;**Test Report**: [${data.reportUrl}](${data.reportUrl})\n`;
         }
         message += `\n| 🟢 **Passed** | 🔴 **Failed** | 🟡 **Broken** | ⚪ **Skipped** | 🟣 **Unknown** |\n`;
         message += `|---|---|---|---|---|\n`;
