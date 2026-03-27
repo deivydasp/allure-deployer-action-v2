@@ -59,9 +59,10 @@ export class Allure {
             command.push('--report-name', this.config.reportName);
         }
 
-        const { exitCode } = await this.allureRunner.runCommand(command);
+        const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
+        if (stdout) info(stdout);
         if (exitCode !== 0) {
-            throw new Error('Failed to generate Allure report');
+            throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
         return this.config.REPORTS_DIR;
     }
