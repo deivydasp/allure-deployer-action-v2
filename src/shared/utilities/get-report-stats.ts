@@ -9,6 +9,12 @@ async function readJsonFile(filePath: string): Promise<any> {
 }
 
 export async function getReportStats(reportDir: string): Promise<ReportStatistic> {
-    const summaryJson = await readJsonFile(path.join(reportDir, 'widgets/summary.json'));
-    return summaryJson.statistic;
+    const statistic = await readJsonFile(path.join(reportDir, 'widgets/statistic.json'));
+    return {
+        passed: statistic.passed ?? 0,
+        broken: statistic.broken ?? 0,
+        failed: statistic.failed ?? 0,
+        skipped: statistic.skipped ?? 0,
+        unknown: statistic.unknown ?? 0,
+    };
 }
