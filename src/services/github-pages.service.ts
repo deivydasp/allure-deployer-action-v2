@@ -43,36 +43,31 @@ export class GithubPagesService implements GithubPagesInterface {
 
     /** Deploys the Allure report to GitHub Pages */
     async deployPages(): Promise<void> {
-        await this.ensureValidState();
-
-        if (!fs.existsSync(path.join(this.reportDir, 'index.html'))) {
-            throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
+        if (!fs.existsSync(this.reportDir)) {
+            throw new Error(`Directory not found: ${this.reportDir}`);
         }
-        await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
+        if (!(await this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT))) {
+            throw new Error('No repository found. Call setupBranch() to initialize.');
+        }
 
-        // Create the commit
-        await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
-
-        // Push with retry mechanism to handle concurrent updates
+        await this.prepareAndCommit();
         await this.gitPushWithRetry();
 
         info(`Allure report pages pushed to '${this.reportDir}' on '${this.branch}' branch`);
     }
 
-    /** Ensures the repository and required directories are set up */
-    private async ensureValidState(): Promise<void> {
-        const reportDirExists = fs.existsSync(this.reportDir);
-        const isRepo = await this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
-        if (!reportDirExists) {
-            throw new Error(`Directory not found: ${this.reportDir}`);
-        }
-        if (!isRepo) {
-            throw new Error('No repository found. Call setupBranch() to initialize.');
-        }
-
-        // Running them sequentially to avoid git lock issues
+    /** Deletes old reports, creates redirect/summary pages, stages the report, and commits */
+    private async prepareAndCommit(): Promise<void> {
+        // Running sequentially to avoid git lock issues
         await this.deleteOldReports();
         await this.createRedirectPage(normalizeUrl(`${this.pageUrl}`));
+        await this.createRootSummaryPage();
+
+        if (!fs.existsSync(path.join(this.reportDir, 'index.html'))) {
+            throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
+        }
+        await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
+        await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
     }
 
     /** Initializes and sets up the branch for GitHub Pages deployment */
@@ -235,29 +230,36 @@ export class GithubPagesService implements GithubPagesInterface {
 
     /** Handles Git push with retry logic specifically for concurrent push scenarios */
     private async gitPushWithRetry(): Promise<void> {
-        await withRetry(async () => {
-            try {
-                try {
-                    await this.git.pull(['--no-rebase', 'origin', this.branch]);
-                    info('Successfully pulled remote changes');
+        // Back up report outside the working tree so deleteOldReports won't find it
+        const backupDir = path.join(path.dirname(inputs.WORKSPACE), 'report-backup');
+        await fs.promises.cp(this.reportDir, backupDir, { recursive: true });
 
-                    // After pull, workspace may have new reports from parallel workflows.
-                    // Regenerate the summary page so it includes all prefixes.
-                    await this.createRootSummaryPage();
-                    // Only commit if there are staged changes (summary may be unchanged)
-                    const status = await this.git.status();
-                    if (!status.isClean()) {
-                        await this.git.commit('Update root summary page after merge');
+        let pushRejected = false;
+        try {
+            await withRetry(async () => {
+                if (pushRejected) {
+                    // Previous push was rejected — reset to latest remote and re-apply
+                    try {
+                        await this.git.merge(['--abort']);
+                    } catch {
+                        /* no merge in progress */
                     }
-                } catch (pullError: any) {
-                    warning(`Pull failed: ${pullError}. Will try direct push...`);
+                    await this.git.fetch('origin', this.branch, { '--depth': 1 });
+                    await this.git.reset(['--hard', `origin/${this.branch}`]);
+                    await fs.promises.cp(backupDir, this.reportDir, { recursive: true });
+                    await this.prepareAndCommit();
                 }
 
-                await this.git.push('origin', this.branch);
-            } catch (error: any) {
-                warning(`Push attempt failed: ${error.message}`);
-                throw error;
-            }
-        });
+                try {
+                    await this.git.push('origin', this.branch);
+                } catch (error: any) {
+                    pushRejected = true;
+                    warning(`Push attempt failed: ${error.message}`);
+                    throw error;
+                }
+            });
+        } finally {
+            await fs.promises.rm(backupDir, { recursive: true, force: true });
+        }
     }
 }
