@@ -12,7 +12,6 @@ export interface AllureConfig {
     HISTORY_PATH: string;
     historyLimit: number;
     showHistory: boolean;
-    dashboard: boolean;
     reportName?: string;
     reportLanguage?: string;
 }
@@ -81,28 +80,17 @@ export class Allure {
     }
 
     private async writeAllureConfig(): Promise<string> {
-        const plugins: Record<string, unknown> = {
-            awesome: {
-                enabled: true,
-                options: {
-                    ...(this.config.reportLanguage && { reportLanguage: this.config.reportLanguage }),
-                },
-            },
-        };
-
-        if (this.config.dashboard) {
-            plugins.dashboard = {
-                enabled: true,
-                options: {
-                    ...(this.config.reportLanguage && { reportLanguage: this.config.reportLanguage }),
-                },
-            };
-        }
-
         const allurerc: Record<string, unknown> = {
             name: this.config.reportName ?? 'Allure Report',
             appendHistory: true,
-            plugins,
+            plugins: {
+                awesome: {
+                    enabled: true,
+                    options: {
+                        ...(this.config.reportLanguage && { reportLanguage: this.config.reportLanguage }),
+                    },
+                },
+            },
         };
 
         if (this.config.showHistory) {
