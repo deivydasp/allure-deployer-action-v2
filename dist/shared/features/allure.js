@@ -36,61 +36,91 @@ export class Allure {
             const executorPath = path.join(this.config.RESULTS_STAGING_PATH, 'executor.json');
             await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
+        const configPath = await this.writeAllureConfig();
         const command = [
-            'awesome',
+            'generate',
             this.config.RESULTS_STAGING_PATH,
+            '--config',
+            configPath,
             '--output',
             this.config.REPORTS_DIR,
         ];
-        if (this.config.showHistory) {
-            command.push('--history-path', this.config.HISTORY_PATH);
-            command.push('--history-limit', this.config.historyLimit.toString());
-        }
-        if (this.config.reportName) {
-            command.push('--report-name', this.config.reportName);
-        }
-        if (this.config.reportLanguage) {
-            command.push('--report-language', this.config.reportLanguage);
-        }
         const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
         if (stdout)
             info(stdout);
         if (exitCode !== 0) {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
-        if (this.config.showHistory && executor?.reportUrl) {
-            await this.patchHistoryUrl(executor.reportUrl);
-            await this.createHistoryRedirect();
+        if (this.config.showHistory) {
+            await this.postProcessHistory(executor?.reportUrl);
+            if (executor?.reportUrl) {
+                await this.createHistoryRedirect();
+            }
         }
         return this.config.REPORTS_DIR;
     }
+    async writeAllureConfig() {
+        const allurerc = {
+            name: this.config.reportName ?? 'Allure Report',
+            appendHistory: true,
+            plugins: {
+                awesome: {
+                    enabled: true,
+                    options: {
+                        ...(this.config.reportLanguage && { reportLanguage: this.config.reportLanguage }),
+                    },
+                },
+            },
+        };
+        if (this.config.showHistory) {
+            allurerc.historyPath = this.config.HISTORY_PATH;
+            allurerc.historyLimit = this.config.historyLimit;
+        }
+        const configPath = path.join(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
+        await fs.writeFile(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
+        return configPath;
+    }
     /**
-     * Patches the last history entry with the report URL so history dots link to previous reports.
+     * Patches the latest history entry with the report URL and truncates to the history limit.
      */
-    async patchHistoryUrl(reportUrl) {
+    async postProcessHistory(reportUrl) {
         try {
             const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
-            const lines = content.trimEnd().split('\n');
-            const lastEntry = JSON.parse(lines[lines.length - 1]);
-            lastEntry.url = reportUrl;
-            lines[lines.length - 1] = JSON.stringify(lastEntry);
+            let lines = content.trimEnd().split('\n');
+            if (reportUrl) {
+                const lastEntry = JSON.parse(lines[lines.length - 1]);
+                lastEntry.url = reportUrl;
+                lines[lines.length - 1] = JSON.stringify(lastEntry);
+            }
+            if (lines.length > this.config.historyLimit) {
+                lines = lines.slice(-this.config.historyLimit);
+            }
             await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
         }
         catch (e) {
-            warning(`Failed to patch history URL: ${e}`);
+            warning(`Failed to post-process history: ${e}`);
         }
     }
     /**
      * Creates an awesome/index.html redirect in the report directory.
-     * Allure 3's awesome theme appends /awesome to history URLs, but self-hosted
+     * Allure 3's awesome theme appends /awesome to history URLs, but single-plugin
      * reports don't have that subdirectory. This redirect preserves the hash fragment
      * so the SPA can route to the correct test result.
+     * Skipped when awesome/ already exists (multi-plugin mode).
      */
     async createHistoryRedirect() {
-        const redirectDir = path.join(this.config.REPORTS_DIR, 'awesome');
-        await fs.mkdir(redirectDir, { recursive: true });
+        const awesomeDir = path.join(this.config.REPORTS_DIR, 'awesome');
+        try {
+            const stat = await fs.stat(awesomeDir);
+            if (stat.isDirectory())
+                return; // multi-plugin mode — awesome/ is a real plugin output
+        }
+        catch {
+            // doesn't exist — create the redirect
+        }
+        await fs.mkdir(awesomeDir, { recursive: true });
         const html = `<!DOCTYPE html>
 <html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
-        await fs.writeFile(path.join(redirectDir, 'index.html'), html, 'utf8');
+        await fs.writeFile(path.join(awesomeDir, 'index.html'), html, 'utf8');
     }
 }
