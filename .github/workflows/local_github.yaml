@@ -25,15 +25,6 @@ on:
       report-name:
         description: 'Title of the report'
         default: 'Allure Report'
-      report-lang:
-        description: 'Allure report language'
-        type: choice
-        default: en
-        options:
-          - en
-          - ru
-          - fr
-          - de
       prefix:
         description: 'Prefix'
         default: 'local-action'
@@ -58,7 +49,7 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
-          language: ${{ github.event.inputs.report-lang }}
+
 
   gh-multi:
     if: ${{ github.event.inputs.job == 'gh-multi' }}
@@ -76,7 +67,7 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
-          language: ${{ github.event.inputs.report-lang }}
+
 
       - name: Deploy Reports to GitHub Pages 2
         uses: ./
@@ -86,7 +77,7 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
-          language: ${{ github.event.inputs.report-lang }}
+
 
   gh-no-backup:
     if: ${{ github.event.inputs.job == 'gh-no-backup' }}
@@ -103,4 +94,4 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
-          language: ${{ github.event.inputs.report-lang }}
+

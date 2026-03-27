@@ -9,15 +9,6 @@ on:
       report-name:
         description: 'Title of the report'
         default: 'Allure Report'
-      report-lang:
-        description: 'Allure report language'
-        type: choice
-        default: en
-        options:
-          - en
-          - ru
-          - fr
-          - de
 
 jobs:
   gh-pages:
@@ -33,4 +24,4 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           prefix: 'examples-gh-pages'
-          language: ${{ github.event.inputs.report-lang }}
+
