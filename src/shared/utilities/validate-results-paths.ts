@@ -2,11 +2,12 @@ import * as fs from 'fs/promises';
 
 export async function validateResultsPaths(commaSeparatedResultPaths: string): Promise<string[]> {
     if (!commaSeparatedResultPaths.includes(',')) {
+        const trimmed = commaSeparatedResultPaths.trim();
         const exists = await fs
-            .access(commaSeparatedResultPaths)
+            .access(trimmed)
             .then(() => true)
             .catch(() => false);
-        return exists ? [commaSeparatedResultPaths] : [];
+        return exists ? [trimmed] : [];
     }
 
     const paths = commaSeparatedResultPaths.split(',');

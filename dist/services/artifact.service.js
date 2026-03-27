@@ -1,7 +1,7 @@
 import { Order } from '../shared/index.js';
 import { DefaultArtifactClient } from '@actions/artifact';
 import pLimit from 'p-limit';
-import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from '../utilities/util.js';
+import { DEFAULT_RETRY_CONFIG, allFulfilledResults, withRetry } from '../utilities/util.js';
 import { Octokit } from '@octokit/rest';
 import https from 'https';
 import fs from 'fs';
@@ -35,9 +35,6 @@ export class ArtifactService {
             });
         };
         await withRetry(operation, DEFAULT_RETRY_CONFIG);
-    }
-    deleteFiles(_matchGlob) {
-        throw new Error('Not implemented');
     }
     async download({ destination, concurrency = 5, files, }) {
         const limit = pLimit(concurrency);
@@ -114,11 +111,6 @@ export class ArtifactService {
             const bTime = new Date(b.created_at).getTime();
             return order === Order.byOldestToNewest ? aTime - bTime : bTime - aTime;
         });
-    }
-    async upload(filePath, destination) {
-        const files = await getAbsoluteFilePaths(filePath);
-        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
-        await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
     async uploadFile(absoluteFilePath, rootDir, destination) {
         const work = async () => await this.artifactClient.uploadArtifact(destination, [absoluteFilePath], rootDir);

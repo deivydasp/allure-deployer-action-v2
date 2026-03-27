@@ -1,11 +1,5 @@
 import { info, warning } from '@actions/core';
 import * as fs from 'fs/promises';
-import path from 'node:path';
-export const ERROR_MESSAGES = {
-    EMPTY_RESULTS: 'Error: The specified results directory is empty.',
-    NO_RESULTS_DIR: 'Error: No Allure result files in the specified directory.',
-    NO_JAVA: 'Error: JAVA_HOME not found. Allure 2.32 requires JAVA runtime installed',
-};
 /**
  * Default retry configuration
  */
@@ -64,20 +58,6 @@ export async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
         }
     }
     throw new Error('Unreachable: withRetry loop completed without return or throw');
-}
-export async function getAbsoluteFilePaths(dir) {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    const filePaths = [];
-    for (const entry of entries) {
-        const fullPath = path.resolve(dir, entry.name);
-        if (entry.isDirectory()) {
-            filePaths.push(...(await getAbsoluteFilePaths(fullPath)));
-        }
-        else if (entry.isFile()) {
-            filePaths.push(fullPath);
-        }
-    }
-    return filePaths;
 }
 export async function copyDirectory(sourceDir, destDir) {
     await fs.cp(sourceDir, destDir, { recursive: true });

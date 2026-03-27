@@ -10,10 +10,8 @@ export interface StorageFile {
 }
 
 export interface StorageProvider {
-    upload(filePath: string, destination: string): Promise<void>;
     getFiles(params: { matchGlob?: string; order?: Order; maxResults?: number }): Promise<StorageFile[]>;
     download(params: { destination: string; concurrency?: number; files: StorageFile[] }): Promise<string[]>;
-    deleteFiles(matchGlob?: string): Promise<void>;
     deleteFile(file: number | string): Promise<void>;
-    sortFiles(files: StorageFile[], order: Order): StorageFile[];
+    uploadFile(absoluteFilePath: string, rootDir: string, destination: string): Promise<void>;
 }

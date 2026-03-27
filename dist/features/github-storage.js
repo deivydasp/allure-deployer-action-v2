@@ -124,11 +124,12 @@ export class GithubStorage {
     async uploadHistory() {
         try {
             await fs.access(this.args.HISTORY_PATH);
-            const historyDir = path.dirname(this.args.HISTORY_PATH);
-            await this.provider.uploadFile(this.args.HISTORY_PATH, historyDir, this.HISTORY_ARCHIVE_NAME);
         }
         catch {
             warning('No history file found. History upload skipped.');
+            return;
         }
+        const historyDir = path.dirname(this.args.HISTORY_PATH);
+        await this.provider.uploadFile(this.args.HISTORY_PATH, historyDir, this.HISTORY_ARCHIVE_NAME);
     }
 }

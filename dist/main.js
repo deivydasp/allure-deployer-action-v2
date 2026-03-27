@@ -14,9 +14,6 @@ import { GitHubService } from './services/github.service.js';
 import { Allure, ConsoleNotifier, copyFiles, getReportStats, NotifyHandler, validateResultsPaths, } from './shared/index.js';
 import { copyDirectory } from './utilities/util.js';
 export async function main() {
-    await executeDeployment();
-}
-async function executeDeployment() {
     try {
         const token = inputs.github_token;
         if (!token) {
@@ -63,7 +60,7 @@ async function executeDeployment() {
         });
         await mkdir(reportDir, { recursive: true, mode: 0o755 });
         const resultPaths = await validateResultsPaths(inputs.allure_results_path);
-        const storage = inputs.show_history ? await initializeStorage(owner, repo, reportDir) : undefined;
+        const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
         const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
         const config = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
@@ -97,7 +94,7 @@ function getGitHubHost({ token, owner, repo, reportDir, workspace, pageUrl, page
     };
     return new GithubHost(new GithubPagesService(config));
 }
-async function initializeStorage(owner, repo, reportDir) {
+async function initializeStorage(owner, repo) {
     const config = {
         owner,
         repo,
@@ -107,7 +104,6 @@ async function initializeStorage(owner, repo, reportDir) {
     if (await service.hasArtifactReadPermission()) {
         const storageConfig = {
             ARCHIVE_DIR: inputs.ARCHIVE_DIR,
-            REPORTS_DIR: reportDir,
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             HISTORY_PATH: inputs.HISTORY_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
@@ -125,7 +121,8 @@ async function stageDeployment({ storage, host, RESULTS_PATHS, }) {
         to: inputs.RESULTS_STAGING_PATH,
         concurrency: inputs.fileProcessingConcurrency,
     });
-    //run sequentially to avoid memory spikes
+    // host.init (git clone) and copyFiles run concurrently.
+    // stageFilesFromStorage (artifact download + unzip) runs after both complete to avoid memory spikes on small runners.
     const result = await host.init();
     await copyResultsFiles;
     if (inputs.show_history) {
@@ -136,9 +133,8 @@ async function stageDeployment({ storage, host, RESULTS_PATHS, }) {
 }
 async function generateAllureReport({ allure, reportUrl }) {
     info('Generating Allure report...');
-    const result = await allure.generate(createExecutor(reportUrl));
+    await allure.generate(createExecutor(reportUrl));
     info('Report generated successfully!');
-    return result;
 }
 function createExecutor(reportUrl) {
     const buildName = `GitHub Run ID: ${github.context.runId}`;

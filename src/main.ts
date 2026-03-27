@@ -29,10 +29,6 @@ import {
 import { copyDirectory } from './utilities/util.js';
 
 export async function main() {
-    await executeDeployment();
-}
-
-async function executeDeployment() {
     try {
         const token = inputs.github_token;
         if (!token) {
@@ -84,7 +80,7 @@ async function executeDeployment() {
         await mkdir(reportDir, { recursive: true, mode: 0o755 });
 
         const resultPaths = await validateResultsPaths(inputs.allure_results_path);
-        const storage = inputs.show_history ? await initializeStorage(owner, repo, reportDir) : undefined;
+        const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
         const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
         const config: AllureConfig = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
@@ -138,7 +134,6 @@ function getGitHubHost({
 async function initializeStorage(
     owner: string,
     repo: string,
-    reportDir: string,
 ): Promise<IStorage | undefined> {
     const config: ArtifactServiceConfig = {
         owner,
@@ -149,7 +144,6 @@ async function initializeStorage(
     if (await service.hasArtifactReadPermission()) {
         const storageConfig: GithubStorageConfig = {
             ARCHIVE_DIR: inputs.ARCHIVE_DIR,
-            REPORTS_DIR: reportDir,
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             HISTORY_PATH: inputs.HISTORY_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
@@ -179,7 +173,8 @@ async function stageDeployment({
         to: inputs.RESULTS_STAGING_PATH,
         concurrency: inputs.fileProcessingConcurrency,
     });
-    //run sequentially to avoid memory spikes
+    // host.init (git clone) and copyFiles run concurrently.
+    // stageFilesFromStorage (artifact download + unzip) runs after both complete to avoid memory spikes on small runners.
     const result = await host.init();
     await copyResultsFiles;
     if (inputs.show_history) {
@@ -191,9 +186,8 @@ async function stageDeployment({
 
 async function generateAllureReport({ allure, reportUrl }: { allure: Allure; reportUrl?: string }) {
     info('Generating Allure report...');
-    const result = await allure.generate(createExecutor(reportUrl));
+    await allure.generate(createExecutor(reportUrl));
     info('Report generated successfully!');
-    return result;
 }
 
 function createExecutor(reportUrl?: string): ExecutorInterface {

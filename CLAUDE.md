@@ -47,12 +47,12 @@ Key details:
 1. **Validate** — Checks GitHub token, verifies Pages is configured for the target branch
 2. **Stage** — Copies allure-results to staging, downloads history.jsonl from GitHub Artifacts (runs sequentially to avoid memory spikes)
 3. **Generate** — Uses `allure generate --config allurerc.json` via `src/shared/features/allure.ts` to produce the HTML report, then post-processes history (URL patching + truncation)
-4. **Deploy** — Git push to gh-pages branch, upload history artifact, copy to custom dir (parallel). Summary page is generated after pull in the push retry loop to handle concurrent deploys.
+4. **Deploy** — `prepareAndCommit` (delete old reports, redirect page, summary page, stage, commit), then push with retry. On push rejection (concurrent workflows), resets to latest remote, restores report from backup, re-runs `prepareAndCommit`, and pushes again. Upload history artifact and copy to custom dir run in parallel.
 5. **Notify** — Console, GitHub PR comment, and Actions job summary
 
 ### Root Summary Page
 
-`src/services/github-pages.service.ts` generates a root `index.html` on gh-pages using `@allurereport/summary` (same SPA as the official allure3-demo). It scans all prefix directories, reads each latest report's `summary.json` for stats, and produces an interactive landing page. Generated after `git pull` in the push retry loop so it always reflects the latest state including reports from parallel workflows.
+`src/services/github-pages.service.ts` generates a root `index.html` on gh-pages using `@allurereport/summary` (same SPA as the official allure3-demo). It scans all prefix directories, reads each latest report's `summary.json` for stats, and produces an interactive landing page. Generated as part of `prepareAndCommit`, which also runs during push retries on the latest remote state, so it always reflects reports from parallel workflows.
 
 ### Source Structure
 
@@ -86,20 +86,20 @@ scripts/
 
 ### Key Modules
 
-- **`src/services/github-pages.service.ts`** — The most complex file. Handles git clone (shallow, depth=1), branch creation, old report cleanup (respects `keep` setting), redirect page generation, root summary page (via `@allurereport/summary`), and commit+push with retry for concurrency conflicts. Summary page is regenerated after pull to handle parallel workflows.
+- **`src/services/github-pages.service.ts`** — The most complex file. Handles git clone (shallow, depth=1), branch creation, old report cleanup (sorts by timestamp directory name, respects `keep` setting), redirect page, root summary page (via `@allurereport/summary`), and commit+push with retry. On concurrent push conflicts, backs up the report, resets to remote, restores and re-applies all changes cleanly.
 - **`src/shared/features/allure.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
 - **`src/shared/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
-- **`src/features/github-storage.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Uses `uploadFile` for single-file uploads.
+- **`src/features/github-storage.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Handles concurrent artifact deletion gracefully (404 = already deleted by parallel workflow).
 - **`src/services/artifact.service.ts`** — Low-level GitHub Artifacts API wrapper using Octokit. Handles download via HTTPS streams, sorting by creation time, permission checking.
 - **`src/shared/utilities/get-report-stats.ts`** — Reads report statistics from `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
 
 ## Key Patterns
 
 - **Dependency injection** — services passed as constructor args (e.g., `GithubHost` wraps `GithubPagesService`)
-- **Interface segregation** — small interfaces: `HostingProvider` (init/deploy), `IStorage` (stage/upload/unzip), `Notifier` (notify)
+- **Interface segregation** — small interfaces: `HostingProvider` (init/deploy), `IStorage` (stage/upload), `Notifier` (notify)
 - **Retry with exponential backoff** — `withRetry()` in `src/utilities/util.ts` (3 retries, 1-10s delay, 2x backoff)
 - **Concurrency control** — `p-limit` for parallel file operations and API calls
-- **Sequential staging** — file copy and artifact download run sequentially to control memory on runners
+- **Sequential staging** — git clone and file copy run concurrently, then artifact download runs after both complete to control memory on runners
 - **Graceful degradation** — if GitHub token lacks `actions: write`, history is skipped with a warning instead of failing
 - **Consistent logging** — all logging uses `@actions/core` (`info`, `warning`, `error`, `setFailed`) for proper GitHub Actions UI integration
 - **Config-driven report generation** — dynamically generated `allurerc.json` passed to `allure generate --config` for full control over plugins, history, and report options

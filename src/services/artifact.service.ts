@@ -1,20 +1,12 @@
 import { Order, StorageFile, StorageProvider } from '../shared/index.js';
 import { DefaultArtifactClient } from '@actions/artifact';
 import pLimit from 'p-limit';
-import { DEFAULT_RETRY_CONFIG, allFulfilledResults, getAbsoluteFilePaths, withRetry } from '../utilities/util.js';
+import { DEFAULT_RETRY_CONFIG, allFulfilledResults, withRetry } from '../utilities/util.js';
 import { Octokit } from '@octokit/rest';
 import https from 'https';
 import fs from 'fs';
 import path from 'node:path';
 import * as github from '@actions/github';
-
-export interface WorkflowRun {
-    id?: number;
-    repository_id: number;
-    head_repository_id: number;
-    head_branch: string;
-    head_sha: string;
-}
 
 export interface ArtifactResponse extends StorageFile {
     node_id: string;
@@ -24,7 +16,6 @@ export interface ArtifactResponse extends StorageFile {
     expired: boolean;
     expires_at: string | null;
     updated_at: string | null;
-    workflow_run?: WorkflowRun | object | null;
 }
 
 export interface ArtifactServiceConfig {
@@ -67,10 +58,6 @@ export class ArtifactService implements StorageProvider {
             });
         };
         await withRetry(operation, DEFAULT_RETRY_CONFIG);
-    }
-
-    deleteFiles(_matchGlob?: string): Promise<void> {
-        throw new Error('Not implemented');
     }
 
     async download({
@@ -166,7 +153,7 @@ export class ArtifactService implements StorageProvider {
         return this.sortFiles(files, order);
     }
 
-    sortFiles(files: ArtifactResponse[], order: Order): ArtifactResponse[] {
+    private sortFiles(files: ArtifactResponse[], order: Order): ArtifactResponse[] {
         if (!files || files.length < 2) {
             return files;
         }
@@ -175,12 +162,6 @@ export class ArtifactService implements StorageProvider {
             const bTime = new Date(b.created_at!).getTime();
             return order === Order.byOldestToNewest ? aTime - bTime : bTime - aTime;
         });
-    }
-
-    async upload(filePath: string, destination: string): Promise<void> {
-        const files = await getAbsoluteFilePaths(filePath);
-        const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
-        await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
 
     async uploadFile(absoluteFilePath: string, rootDir: string, destination: string): Promise<void> {

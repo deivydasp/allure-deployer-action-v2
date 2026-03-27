@@ -106,18 +106,23 @@ export class Allure {
      * Skipped when awesome/ already exists (multi-plugin mode).
      */
     async createHistoryRedirect() {
-        const awesomeDir = path.join(this.config.REPORTS_DIR, 'awesome');
         try {
-            const stat = await fs.stat(awesomeDir);
-            if (stat.isDirectory())
-                return; // multi-plugin mode — awesome/ is a real plugin output
-        }
-        catch {
-            // doesn't exist — create the redirect
-        }
-        await fs.mkdir(awesomeDir, { recursive: true });
-        const html = `<!DOCTYPE html>
+            const awesomeDir = path.join(this.config.REPORTS_DIR, 'awesome');
+            try {
+                const stat = await fs.stat(awesomeDir);
+                if (stat.isDirectory())
+                    return; // multi-plugin mode — awesome/ is a real plugin output
+            }
+            catch {
+                // doesn't exist — create the redirect
+            }
+            await fs.mkdir(awesomeDir, { recursive: true });
+            const html = `<!DOCTYPE html>
 <html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
-        await fs.writeFile(path.join(awesomeDir, 'index.html'), html, 'utf8');
+            await fs.writeFile(path.join(awesomeDir, 'index.html'), html, 'utf8');
+        }
+        catch (e) {
+            warning(`Failed to create history redirect: ${e}`);
+        }
     }
 }

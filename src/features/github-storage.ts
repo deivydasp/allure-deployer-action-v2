@@ -15,7 +15,6 @@ export interface GithubStorageConfig {
     showHistory: boolean;
     RESULTS_STAGING_PATH: string;
     ARCHIVE_DIR: string;
-    REPORTS_DIR: string;
     HISTORY_PATH: string;
 }
 
@@ -24,7 +23,7 @@ export class GithubStorage implements IStorage {
 
     constructor(
         private readonly provider: ArtifactService,
-        readonly args: GithubStorageConfig,
+        private readonly args: GithubStorageConfig,
     ) {
         this.HISTORY_ARCHIVE_NAME = inputs.prefix ? `${inputs.prefix}-last-history` : 'last-history';
     }
@@ -36,7 +35,7 @@ export class GithubStorage implements IStorage {
         }
     }
 
-    unzipToStaging(zipFilePath: string, outputDir: string): Promise<boolean> {
+    private unzipToStaging(zipFilePath: string, outputDir: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
             const writePromises: Promise<void>[] = [];
 
@@ -149,11 +148,12 @@ export class GithubStorage implements IStorage {
     private async uploadHistory(): Promise<void> {
         try {
             await fs.access(this.args.HISTORY_PATH);
-            const historyDir = path.dirname(this.args.HISTORY_PATH);
-            await this.provider.uploadFile(this.args.HISTORY_PATH, historyDir, this.HISTORY_ARCHIVE_NAME);
         } catch {
             warning('No history file found. History upload skipped.');
+            return;
         }
+        const historyDir = path.dirname(this.args.HISTORY_PATH);
+        await this.provider.uploadFile(this.args.HISTORY_PATH, historyDir, this.HISTORY_ARCHIVE_NAME);
     }
 
 }
