@@ -46,7 +46,6 @@ export class GithubPagesService {
         // Running them sequentially to avoid git lock issues
         await this.deleteOldReports();
         await this.createRedirectPage(normalizeUrl(`${this.pageUrl}`));
-        await this.createRootSummaryPage();
     }
     /** Initializes and sets up the branch for GitHub Pages deployment */
     async setupBranch() {
@@ -188,21 +187,27 @@ export class GithubPagesService {
     async gitPushWithRetry() {
         await withRetry(async () => {
             try {
-                // Pull to fetch and merge remote changes in one operation
-                // Specify merge strategy to handle divergent branches
                 try {
                     await this.git.pull(['--no-rebase', 'origin', this.branch]);
                     info('Successfully pulled remote changes');
+                    // After pull, workspace may have new reports from parallel workflows.
+                    // Regenerate the summary page so it includes all prefixes.
+                    await this.createRootSummaryPage();
+                    await this.git.add('-A');
+                    // Only commit if there are staged changes (summary may be unchanged)
+                    const status = await this.git.status();
+                    if (!status.isClean()) {
+                        await this.git.commit('Update root summary page after merge');
+                    }
                 }
                 catch (pullError) {
                     warning(`Pull failed: ${pullError}. Will try direct push...`);
                 }
-                // Push to remote
                 await this.git.push('origin', this.branch);
             }
             catch (error) {
                 warning(`Push attempt failed: ${error.message}`);
-                throw error; // Let the retry mechanism handle it
+                throw error;
             }
         });
     }
