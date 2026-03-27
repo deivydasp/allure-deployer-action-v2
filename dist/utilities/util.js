@@ -32,7 +32,8 @@ export function isRetryableError(error) {
         message.includes('rate limit') ||
         message.includes('timeout') ||
         message.includes('network error') ||
-        message.includes('tip of your current branch is behind'));
+        message.includes('tip of your current branch is behind') ||
+        message.includes('failed to push some refs'));
 }
 /**
  * Utility function to implement retry logic with exponential backoff
