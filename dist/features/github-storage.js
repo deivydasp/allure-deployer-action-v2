@@ -127,6 +127,12 @@ export class GithubStorage {
      * Zips and uploads the history archive to the remote storage.
      */
     async uploadHistory() {
-        await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
+        try {
+            await fs.access(this.getHistoryFolder());
+            await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
+        }
+        catch {
+            warning('No history folder found in report output. History upload skipped.');
+        }
     }
 }

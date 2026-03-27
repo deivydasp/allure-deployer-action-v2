@@ -153,7 +153,12 @@ export class GithubStorage implements IStorage {
      * Zips and uploads the history archive to the remote storage.
      */
     private async uploadHistory(): Promise<void> {
-        await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
+        try {
+            await fs.access(this.getHistoryFolder());
+            await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
+        } catch {
+            warning('No history folder found in report output. History upload skipped.');
+        }
     }
 
 }
