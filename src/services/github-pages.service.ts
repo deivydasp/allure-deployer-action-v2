@@ -142,36 +142,41 @@ export class GithubPagesService implements GithubPagesInterface {
             for (const entry of entries) {
                 if (!entry.isDirectory()) continue;
                 const prefixDir = path.join(rootDir, entry.name);
-                if (!fs.existsSync(path.join(prefixDir, 'index.html'))) continue;
 
-                // Find latest report run dir and read its summary.json
+                // Only include prefixes that have numeric run subdirs (deployed reports)
+                const runs = await fs.promises.readdir(prefixDir, { withFileTypes: true }).catch(() => []);
+                const runDirs = (runs as Dirent[])
+                    .filter((r) => r.isDirectory() && /^\d+$/.test(r.name))
+                    .sort((a, b) => Number(b.name) - Number(a.name));
+
+                if (runDirs.length === 0) continue;
+
+                const latestDir = path.join(prefixDir, runDirs[0].name);
                 try {
-                    const runs = await fs.promises.readdir(prefixDir, { withFileTypes: true });
-                    const runDirs = runs
-                        .filter((r) => r.isDirectory() && /^\d+$/.test(r.name))
-                        .sort((a, b) => Number(b.name) - Number(a.name));
-
-                    if (runDirs.length > 0) {
-                        const latestDir = path.join(prefixDir, runDirs[0].name);
-                        for (const candidate of ['summary.json', 'awesome/summary.json']) {
-                            const summaryPath = path.join(latestDir, candidate);
-                            if (fs.existsSync(summaryPath)) {
-                                const summary = JSON.parse(await fs.promises.readFile(summaryPath, 'utf8'));
-                                summary.name = summary.name ?? entry.name;
-                                summary.href = `${entry.name}/`;
-                                summaries.push(summary);
-                                break;
-                            }
+                    for (const candidate of ['summary.json', 'awesome/summary.json']) {
+                        const summaryPath = path.join(latestDir, candidate);
+                        if (fs.existsSync(summaryPath)) {
+                            const summary = JSON.parse(await fs.promises.readFile(summaryPath, 'utf8'));
+                            summary.name = summary.name ?? entry.name;
+                            summary.href = `${entry.name}/`;
+                            summaries.push(summary);
+                            break;
                         }
                     }
-                } catch {
-                    // stats unavailable — skip this prefix
+                } catch (e) {
+                    warning(`Failed to read summary for prefix '${entry.name}': ${e}`);
                 }
             }
 
             if (summaries.length === 0) return;
 
-            const summaryModule: any = await import('@allurereport/summary');
+            let summaryModule: any;
+            try {
+                summaryModule = await import('@allurereport/summary');
+            } catch (e) {
+                warning(`@allurereport/summary not available, skipping root summary page: ${e}`);
+                return;
+            }
             const generateSummary = summaryModule.generateSummary ?? summaryModule.default;
             await generateSummary(rootDir, summaries);
             await this.git.add(path.join(rootDir, 'index.html'));
