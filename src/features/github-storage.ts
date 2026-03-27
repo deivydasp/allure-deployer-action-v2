@@ -149,7 +149,8 @@ export class GithubStorage implements IStorage {
     private async uploadHistory(): Promise<void> {
         try {
             await fs.access(this.args.HISTORY_PATH);
-            await this.provider.upload(this.args.HISTORY_PATH, this.HISTORY_ARCHIVE_NAME);
+            const historyDir = path.dirname(this.args.HISTORY_PATH);
+            await this.provider.upload(historyDir, this.HISTORY_ARCHIVE_NAME);
         } catch {
             warning('No history file found. History upload skipped.');
         }

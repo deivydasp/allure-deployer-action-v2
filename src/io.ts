@@ -31,7 +31,7 @@ const inputs: Inputs & DefaultConfig = {
     fileProcessingConcurrency: 10,
     RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
     ARCHIVE_DIR: path.join(runtimeDir(), 'archive'),
-    HISTORY_PATH: path.join(runtimeDir(), 'history.jsonl'),
+    HISTORY_PATH: path.join(runtimeDir(), 'history', 'history.jsonl'),
     WORKSPACE: workspace(),
 };
 
