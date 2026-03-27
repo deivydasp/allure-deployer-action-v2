@@ -91,6 +91,7 @@ async function executeDeployment() {
             REPORTS_DIR: reportDir,
             HISTORY_PATH: inputs.HISTORY_PATH,
             historyLimit: inputs.keep,
+            showHistory: inputs.show_history,
             reportName: inputs.report_name,
             reportLanguage: inputs.language,
         };

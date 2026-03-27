@@ -1,10 +1,14 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 const require = createRequire(import.meta.url);
-// allure's exports map only exposes ./dist/index.js, so resolve that and navigate up to cli.js
-const allureEntry = require.resolve('allure');
-const allureCli = path.join(allureEntry, '..', '..', 'cli.js');
+const allurePkgDir = path.dirname(require.resolve('allure'));
+// Navigate from dist/ up to the package root where cli.js lives
+const allureCli = path.resolve(allurePkgDir, '..', 'cli.js');
+if (!existsSync(allureCli)) {
+    throw new Error(`Allure CLI not found at ${allureCli}. The allure package structure may have changed.`);
+}
 export class AllureService {
     runCommand(args) {
         const allureProcess = spawn(process.execPath, [allureCli, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });

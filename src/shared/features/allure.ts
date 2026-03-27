@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'node:path';
-import { info } from '@actions/core';
+import { info, warning } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
 import { CommandRunner } from '../interfaces/command.interface.js';
 import { ExecutorInterface } from '../interfaces/executor.interface.js';
@@ -11,6 +11,7 @@ export interface AllureConfig {
     REPORTS_DIR: string;
     HISTORY_PATH: string;
     historyLimit: number;
+    showHistory: boolean;
     reportName?: string;
     reportLanguage?: string;
 }
@@ -52,22 +53,22 @@ export class Allure {
             await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
 
-        // allure awesome reads existing history from --history-path and appends the new run
         const command = [
             'awesome',
             this.config.RESULTS_STAGING_PATH,
             '--output',
             this.config.REPORTS_DIR,
-            '--history-path',
-            this.config.HISTORY_PATH,
         ];
+        if (this.config.showHistory) {
+            command.push('--history-path', this.config.HISTORY_PATH);
+            command.push('--history-limit', this.config.historyLimit.toString());
+        }
         if (this.config.reportName) {
             command.push('--report-name', this.config.reportName);
         }
         if (this.config.reportLanguage) {
             command.push('--report-language', this.config.reportLanguage);
         }
-        command.push('--history-limit', this.config.historyLimit.toString());
 
         const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
         if (stdout) info(stdout);
@@ -75,8 +76,7 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
 
-        // Patch history with report URL and create redirect for history links
-        if (executor?.reportUrl) {
+        if (this.config.showHistory && executor?.reportUrl) {
             await this.patchHistoryUrl(executor.reportUrl);
             await this.createHistoryRedirect();
         }
@@ -95,8 +95,8 @@ export class Allure {
             lastEntry.url = reportUrl;
             lines[lines.length - 1] = JSON.stringify(lastEntry);
             await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
-        } catch {
-            // non-critical
+        } catch (e) {
+            warning(`Failed to patch history URL: ${e}`);
         }
     }
 

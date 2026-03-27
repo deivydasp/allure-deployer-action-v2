@@ -118,13 +118,13 @@ export class GithubStorage {
         await allFulfilledResults(tasks);
     }
     /**
-     * Uploads the history.jsonl file to the remote storage.
+     * Uploads only the history.jsonl file to the remote storage.
      */
     async uploadHistory() {
         try {
             await fs.access(this.args.HISTORY_PATH);
             const historyDir = path.dirname(this.args.HISTORY_PATH);
-            await this.provider.upload(historyDir, this.HISTORY_ARCHIVE_NAME);
+            await this.provider.uploadFile(this.args.HISTORY_PATH, historyDir, this.HISTORY_ARCHIVE_NAME);
         }
         catch {
             warning('No history file found. History upload skipped.');

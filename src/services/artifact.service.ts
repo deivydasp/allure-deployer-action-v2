@@ -189,4 +189,9 @@ export class ArtifactService implements StorageProvider {
         const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
         await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
+
+    async uploadFile(absoluteFilePath: string, rootDir: string, destination: string): Promise<void> {
+        const work = async () => await this.artifactClient.uploadArtifact(destination, [absoluteFilePath], rootDir);
+        await withRetry(work, DEFAULT_RETRY_CONFIG);
+    }
 }

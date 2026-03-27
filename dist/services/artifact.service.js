@@ -124,4 +124,8 @@ export class ArtifactService {
         const work = async () => await this.artifactClient.uploadArtifact(destination, files, filePath);
         await withRetry(work, DEFAULT_RETRY_CONFIG);
     }
+    async uploadFile(absoluteFilePath, rootDir, destination) {
+        const work = async () => await this.artifactClient.uploadArtifact(destination, [absoluteFilePath], rootDir);
+        await withRetry(work, DEFAULT_RETRY_CONFIG);
+    }
 }
