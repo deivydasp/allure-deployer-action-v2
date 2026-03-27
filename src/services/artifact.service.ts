@@ -34,18 +34,16 @@ export interface ArtifactServiceConfig {
 }
 
 export class ArtifactService implements StorageProvider {
-    artifactClient: DefaultArtifactClient;
-    octokit: Octokit;
-    owner: string;
-    repo: string;
-    token: string;
+    private readonly artifactClient: DefaultArtifactClient;
+    private readonly octokit: Octokit;
+    private readonly owner: string;
+    private readonly repo: string;
 
     constructor({ token, repo, owner }: ArtifactServiceConfig) {
         this.artifactClient = new DefaultArtifactClient();
         this.octokit = new Octokit({ auth: token, baseUrl: github.context.apiUrl });
         this.owner = owner;
         this.repo = repo;
-        this.token = token;
     }
 
     async hasArtifactReadPermission(): Promise<boolean> {
@@ -105,11 +103,6 @@ export class ArtifactService implements StorageProvider {
                         );
                     };
                     const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG);
-                    if (!urlResponse) {
-                        throw new Error(
-                            `Failed to retrieve artifact download URL. Response: ${JSON.stringify(urlResponse)}`,
-                        );
-                    }
                     const artifactUrl = urlResponse.url;
                     return new Promise((resolve, reject) => {
                         https

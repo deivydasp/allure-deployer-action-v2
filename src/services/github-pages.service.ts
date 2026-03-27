@@ -61,10 +61,8 @@ export class GithubPagesService implements GithubPagesInterface {
 
     /** Ensures the repository and required directories are set up */
     private async ensureValidState(): Promise<void> {
-        const [reportDirExists, isRepo] = await Promise.all([
-            fs.existsSync(this.reportDir),
-            this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT),
-        ]);
+        const reportDirExists = fs.existsSync(this.reportDir);
+        const isRepo = await this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
         if (!reportDirExists) {
             throw new Error(`Directory not found: ${this.reportDir}`);
         }
@@ -195,19 +193,18 @@ export class GithubPagesService implements GithubPagesInterface {
             const parentDir = path.dirname(this.reportDir);
             const entries: Dirent[] = await fs.promises.readdir(parentDir, { withFileTypes: true });
 
-            // Single pass: filter report directories and collect mtime
-            const reports: { dir: string; mtimeMs: number }[] = [];
+            // Single pass: filter report directories (name is a Date.now() timestamp)
+            const reports: { dir: string; name: string }[] = [];
             for (const entry of entries) {
                 if (!entry.isDirectory()) continue;
                 const dirPath = path.join(entry.parentPath, entry.name);
                 if (fs.existsSync(path.join(dirPath, 'index.html'))) {
-                    const stats = await fs.promises.stat(dirPath);
-                    reports.push({ dir: dirPath, mtimeMs: stats.mtimeMs });
+                    reports.push({ dir: dirPath, name: entry.name });
                 }
             }
 
             if (reports.length > 1 && reports.length >= inputs.keep) {
-                reports.sort((a, b) => a.mtimeMs - b.mtimeMs);
+                reports.sort((a, b) => Number(a.name) - Number(b.name));
                 const limit = pLimit(10);
                 const toDelete = reports.slice(0, reports.length - inputs.keep);
                 await allFulfilledResults(
@@ -247,7 +244,6 @@ export class GithubPagesService implements GithubPagesInterface {
                     // After pull, workspace may have new reports from parallel workflows.
                     // Regenerate the summary page so it includes all prefixes.
                     await this.createRootSummaryPage();
-                    await this.git.add('-A');
                     // Only commit if there are staged changes (summary may be unchanged)
                     const status = await this.git.status();
                     if (!status.isClean()) {

@@ -110,29 +110,27 @@ export class GithubStorage implements IStorage {
 
         const limit = pLimit(this.args.fileProcessingConcurrency);
         const tasks: Promise<any>[] = [];
-        if (files.length > 1) {
-            const filesToDelete = files.splice(1);
-            for (const file of filesToDelete) {
-                tasks.push(
-                    limit(async () => {
-                        try {
-                            await this.provider.deleteFile(file.id);
-                        } catch (error) {
-                            if (error instanceof RequestError && error.status === 403) {
-                                warning(
-                                    `Failed to delete outdated Allure History file. Ensure that GitHub token has 'actions: write' permission`,
-                                );
-                            } else {
-                                warning(`Delete file error: ${error}`);
-                            }
+        const [latest, ...outdated] = files;
+        for (const file of outdated) {
+            tasks.push(
+                limit(async () => {
+                    try {
+                        await this.provider.deleteFile(file.id);
+                    } catch (error) {
+                        if (error instanceof RequestError && error.status === 403) {
+                            warning(
+                                `Failed to delete outdated Allure History file. Ensure that GitHub token has 'actions: write' permission`,
+                            );
+                        } else {
+                            warning(`Delete file error: ${error}`);
                         }
-                    }),
-                );
-            }
+                    }
+                }),
+            );
         }
 
         const downloadedPaths = await this.provider.download({
-            files: [files[0]],
+            files: [latest],
             destination: this.args.ARCHIVE_DIR,
         });
         if (downloadedPaths.length > 0) {

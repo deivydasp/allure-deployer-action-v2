@@ -98,7 +98,7 @@ async function executeDeployment() {
         const allure = new Allure({ config });
         await generateAllureReport({ allure, reportUrl });
         const [resultsStats] = await finalizeDeployment({ host, storage, reportDir });
-        await sendNotifications(resultsStats, reportUrl, allure.environments);
+        await sendNotifications(resultsStats, reportUrl, allure.readEnvironments());
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
     }

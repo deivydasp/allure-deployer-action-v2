@@ -8,12 +8,12 @@ export class Allure {
         this.allureRunner = allureRunner ?? new AllureService();
         this.config = config;
     }
-    get environments() {
-        const map = new Map();
+    readEnvironments() {
         try {
             const properties = propertiesReader({
                 sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
+            const map = new Map();
             info('Environments');
             for (const [key, value] of properties.entries()) {
                 info(`${key}: ${value}`);
@@ -23,13 +23,10 @@ export class Allure {
         }
         catch (e) {
             if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-                // environment.properties file does not exist
+                return undefined;
             }
-            else {
-                throw e;
-            }
+            throw e;
         }
-        return undefined;
     }
     async generate(executor) {
         if (executor) {

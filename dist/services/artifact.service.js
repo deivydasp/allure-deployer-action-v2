@@ -13,7 +13,6 @@ export class ArtifactService {
         this.octokit = new Octokit({ auth: token, baseUrl: github.context.apiUrl });
         this.owner = owner;
         this.repo = repo;
-        this.token = token;
     }
     async hasArtifactReadPermission() {
         try {
@@ -58,9 +57,6 @@ export class ArtifactService {
                     });
                 };
                 const urlResponse = await withRetry(operation, DEFAULT_RETRY_CONFIG);
-                if (!urlResponse) {
-                    throw new Error(`Failed to retrieve artifact download URL. Response: ${JSON.stringify(urlResponse)}`);
-                }
                 const artifactUrl = urlResponse.url;
                 return new Promise((resolve, reject) => {
                     https

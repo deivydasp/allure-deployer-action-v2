@@ -25,12 +25,12 @@ export class Allure {
         this.config = config;
     }
 
-    get environments(): Map<string, string> | undefined {
-        const map = new Map<string, string>();
+    readEnvironments(): Map<string, string> | undefined {
         try {
             const properties = propertiesReader({
                 sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
+            const map = new Map<string, string>();
             info('Environments');
             for (const [key, value] of properties.entries()) {
                 info(`${key}: ${value}`);
@@ -39,12 +39,10 @@ export class Allure {
             return map;
         } catch (e) {
             if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'ENOENT') {
-                // environment.properties file does not exist
-            } else {
-                throw e;
+                return undefined;
             }
+            throw e;
         }
-        return undefined;
     }
 
     async generate(executor?: ExecutorInterface): Promise<string> {
