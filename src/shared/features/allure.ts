@@ -73,27 +73,6 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
 
-        // Patch the latest history entry with the report URL (allure doesn't set it for self-hosted reports)
-        if (executor?.reportUrl) {
-            await this.patchHistoryUrl(executor.reportUrl);
-        }
-
         return this.config.REPORTS_DIR;
-    }
-
-    /**
-     * Patches the last entry in history.jsonl with the report URL so history links are clickable.
-     */
-    private async patchHistoryUrl(reportUrl: string): Promise<void> {
-        try {
-            const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
-            const lines = content.trimEnd().split('\n');
-            const lastEntry = JSON.parse(lines[lines.length - 1]);
-            lastEntry.url = reportUrl;
-            lines[lines.length - 1] = JSON.stringify(lastEntry);
-            await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
-        } catch {
-            // non-critical — history links won't be clickable but report still works
-        }
     }
 }
