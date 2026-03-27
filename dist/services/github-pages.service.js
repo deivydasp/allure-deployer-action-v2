@@ -127,15 +127,15 @@ export class GithubPagesService {
             }
             if (summaries.length === 0)
                 return;
-            let summaryModule;
+            let generateSummary;
             try {
-                summaryModule = await import('@allurereport/summary');
+                const mod = await import('@allurereport/summary');
+                generateSummary = mod.generateSummary ?? mod.default;
             }
             catch (e) {
                 warning(`@allurereport/summary not available, skipping root summary page: ${e}`);
                 return;
             }
-            const generateSummary = summaryModule.generateSummary ?? summaryModule.default;
             await generateSummary(rootDir, summaries);
             await this.git.add(path.join(rootDir, 'index.html'));
             info('Root summary page created');
