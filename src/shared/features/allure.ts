@@ -51,9 +51,7 @@ export class Allure {
             await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
 
-        // Build history from results (appends to history.jsonl)
-        await this.buildHistory();
-
+        // allure awesome reads existing history from --history-path and appends the new run
         const command = [
             'awesome',
             this.config.RESULTS_STAGING_PATH,
@@ -75,21 +73,5 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
         return this.config.REPORTS_DIR;
-    }
-
-    private async buildHistory(): Promise<void> {
-        const command = [
-            'history',
-            this.config.RESULTS_STAGING_PATH,
-            '--history-path',
-            this.config.HISTORY_PATH,
-        ];
-        if (this.config.reportName) {
-            command.push('--report-name', this.config.reportName);
-        }
-        const { exitCode, stderr } = await this.allureRunner.runCommand(command);
-        if (exitCode !== 0) {
-            info(`History generation skipped: ${stderr}`);
-        }
     }
 }
