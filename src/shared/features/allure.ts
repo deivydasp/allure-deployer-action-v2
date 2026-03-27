@@ -73,6 +73,42 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
 
+        // Patch history with report URL and create redirect for history links
+        if (executor?.reportUrl) {
+            await this.patchHistoryUrl(executor.reportUrl);
+            await this.createHistoryRedirect();
+        }
+
         return this.config.REPORTS_DIR;
+    }
+
+    /**
+     * Patches the last history entry with the report URL so history dots link to previous reports.
+     */
+    private async patchHistoryUrl(reportUrl: string): Promise<void> {
+        try {
+            const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
+            const lines = content.trimEnd().split('\n');
+            const lastEntry = JSON.parse(lines[lines.length - 1]);
+            lastEntry.url = reportUrl;
+            lines[lines.length - 1] = JSON.stringify(lastEntry);
+            await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
+        } catch {
+            // non-critical
+        }
+    }
+
+    /**
+     * Creates an awesome/index.html redirect in the report directory.
+     * Allure 3's awesome theme appends /awesome to history URLs, but self-hosted
+     * reports don't have that subdirectory. This redirect preserves the hash fragment
+     * so the SPA can route to the correct test result.
+     */
+    private async createHistoryRedirect(): Promise<void> {
+        const redirectDir = path.join(this.config.REPORTS_DIR, 'awesome');
+        await fs.mkdir(redirectDir, { recursive: true });
+        const html = `<!DOCTYPE html>
+<html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
+        await fs.writeFile(path.join(redirectDir, 'index.html'), html, 'utf8');
     }
 }
