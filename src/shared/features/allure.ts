@@ -10,6 +10,7 @@ export interface AllureConfig {
     RESULTS_STAGING_PATH: string;
     REPORTS_DIR: string;
     HISTORY_PATH: string;
+    historyLimit: number;
     reportName?: string;
     reportLanguage?: string;
 }
@@ -66,6 +67,7 @@ export class Allure {
         if (this.config.reportLanguage) {
             command.push('--report-language', this.config.reportLanguage);
         }
+        command.push('--history-limit', this.config.historyLimit.toString());
 
         const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
         if (stdout) info(stdout);

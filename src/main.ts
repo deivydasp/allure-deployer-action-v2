@@ -90,6 +90,7 @@ async function executeDeployment() {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
             HISTORY_PATH: inputs.HISTORY_PATH,
+            historyLimit: inputs.keep,
             reportName: inputs.report_name,
             reportLanguage: inputs.language,
         };
