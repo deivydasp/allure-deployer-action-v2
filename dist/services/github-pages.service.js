@@ -203,7 +203,6 @@ export class GithubPagesService {
                 }
                 catch (error) {
                     pushRejected = true;
-                    warning(`Push attempt failed: ${error.message}`);
                     throw error;
                 }
             });

@@ -254,7 +254,6 @@ export class GithubPagesService implements GithubPagesInterface {
                     await this.git.push('origin', this.branch);
                 } catch (error: any) {
                     pushRejected = true;
-                    warning(`Push attempt failed: ${error.message}`);
                     throw error;
                 }
             });

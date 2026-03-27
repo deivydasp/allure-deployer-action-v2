@@ -117,7 +117,9 @@ export class GithubStorage implements IStorage {
                     try {
                         await this.provider.deleteFile(file.id);
                     } catch (error) {
-                        if (error instanceof RequestError && error.status === 403) {
+                        if (error instanceof RequestError && error.status === 404) {
+                            warning(`History artifact ${file.id} already deleted (likely by a concurrent workflow)`);
+                        } else if (error instanceof RequestError && error.status === 403) {
                             warning(
                                 `Failed to delete outdated Allure History file. Ensure that GitHub token has 'actions: write' permission`,
                             );
