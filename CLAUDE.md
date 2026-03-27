@@ -17,19 +17,42 @@ The action runs on **Node 24**. The build produces two ncc bundles:
 - `dist/main/index.js` — main action entry point
 - `dist/cleanup/index.js` — post-action cleanup (currently no-op)
 
-`dist/` is committed to git (GitHub Actions runs it directly). `node_modules/` is not — ncc bundles all dependencies.
+`dist/` is committed to git (GitHub Actions runs it directly). `node_modules/` is not — ncc bundles all dependencies except `allure` and `@allurereport/summary` which are externalized (`-e` flags) and installed separately in `dist/main/node_modules/`.
+
+### Build Pipeline
+
+The build script does:
+1. `tsc` — compile TypeScript
+2. `ncc build` — bundle into `dist/main/index.js` with `allure` and `@allurereport/summary` as externals
+3. `ncc build` — bundle cleanup into `dist/cleanup/index.js`
+4. `node scripts/patch-dist-package.js` — adds `overrides: { "d3-time": "3" }` to `dist/main/package.json` to fix npm hoisting issue where d3-time@1.x gets hoisted over d3-time@3.x (breaking d3-scale)
+5. `npm install allure@^3.3.1` in `dist/main/` — installs the allure CLI and its dependency tree
 
 ## Architecture
 
 **ESM-only project** — uses `"type": "module"` with `.js` extensions in all TypeScript imports.
 
+### Allure 3 Integration
+
+Uses the **`allure` npm package (v3.x)** — a pure JavaScript CLI (no Java required). Report generation uses `allure generate --config allurerc.json` with a dynamically generated config file that enables the `awesome` plugin.
+
+Key details:
+- **Config-driven**: `src/shared/features/allure.ts` generates `allurerc.json` at runtime with plugin config, history path, and history limit
+- **CLI invocation**: `src/shared/services/allure.service.ts` spawns `node cli.js` (resolved from the allure package) as a child process
+- **History**: Uses JSONL format (`history.jsonl`) stored as GitHub Artifacts. The `allure awesome` plugin reads/appends history via `--history-path` config. Post-generation, history is truncated to the `keep` limit and patched with the report URL for clickable history links.
+- **History redirect**: Creates `awesome/index.html` redirect in single-plugin reports because Allure 3's awesome theme appends `/awesome` to history URLs
+
 ### Deployment Flow (src/main.ts)
 
 1. **Validate** — Checks GitHub token, verifies Pages is configured for the target branch
-2. **Stage** — Copies allure-results to staging, downloads history artifacts from GitHub Artifacts (runs sequentially to avoid memory spikes)
-3. **Generate** — Uses `allure-commandline` via `src/shared/features/allure.ts` to produce the HTML report
-4. **Deploy** — Git push to gh-pages branch, upload artifacts, copy to custom dir (parallel)
+2. **Stage** — Copies allure-results to staging, downloads history.jsonl from GitHub Artifacts (runs sequentially to avoid memory spikes)
+3. **Generate** — Uses `allure generate --config allurerc.json` via `src/shared/features/allure.ts` to produce the HTML report, then post-processes history (URL patching + truncation)
+4. **Deploy** — Git push to gh-pages branch, upload history artifact, copy to custom dir (parallel). Summary page is generated after pull in the push retry loop to handle concurrent deploys.
 5. **Notify** — Console, GitHub PR comment, and Actions job summary
+
+### Root Summary Page
+
+`src/services/github-pages.service.ts` generates a root `index.html` on gh-pages using `@allurereport/summary` (same SPA as the official allure3-demo). It scans all prefix directories, reads each latest report's `summary.json` for stats, and produces an interactive landing page. Generated after `git pull` in the push retry loop so it always reflects the latest state including reports from parallel workflows.
 
 ### Source Structure
 
@@ -44,7 +67,7 @@ src/
 │   ├── hosting/github.host.ts        # HostingProvider impl for GitHub Pages
 │   └── messaging/github-notifier.ts  # Notifier impl for PR comments + job summary
 ├── services/
-│   ├── github-pages.service.ts       # Git operations (clone, commit, push, cleanup)
+│   ├── github-pages.service.ts       # Git operations (clone, commit, push, cleanup, summary page)
 │   ├── artifact.service.ts           # GitHub Artifacts API (upload/download/list/delete)
 │   └── github.service.ts             # GitHub API (PR comments, outputs, summaries)
 ├── utilities/
@@ -54,17 +77,21 @@ src/
     ├── index.ts                      # Barrel export
     ├── interfaces/                   # HostingProvider, IStorage, StorageProvider, Notifier, etc.
     ├── types/                        # ReportStatistic, NotificationData
-    ├── features/                     # Allure report gen, ConsoleNotifier
-    ├── services/                     # AllureService (CLI wrapper)
+    ├── features/                     # Allure report gen (allurerc config, history post-processing)
+    ├── services/                     # AllureService (CLI wrapper via child_process.spawn)
     └── utilities/                    # NotifyHandler, validateResultsPaths, copyFiles, getReportStats
+scripts/
+    └── patch-dist-package.js         # Adds d3-time override to dist/main/package.json
 ```
 
 ### Key Modules
 
-- **`src/services/github-pages.service.ts`** — The most complex file. Handles git clone (shallow, depth=1), branch creation, old report cleanup (respects `keep` setting), redirect page generation, and commit+push with retry for concurrency conflicts.
-- **`src/features/github-storage.ts`** — Downloads previous history archives from GitHub Artifacts, unzips them to staging, uploads new archives after report generation. Uses `p-limit` for concurrency control.
+- **`src/services/github-pages.service.ts`** — The most complex file. Handles git clone (shallow, depth=1), branch creation, old report cleanup (respects `keep` setting), redirect page generation, root summary page (via `@allurereport/summary`), and commit+push with retry for concurrency conflicts. Summary page is regenerated after pull to handle parallel workflows.
+- **`src/shared/features/allure.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
+- **`src/shared/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
+- **`src/features/github-storage.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Uses `uploadFile` for single-file uploads.
 - **`src/services/artifact.service.ts`** — Low-level GitHub Artifacts API wrapper using Octokit. Handles download via HTTPS streams, sorting by creation time, permission checking.
-- **`src/shared/`** — Inlined from the former `allure-deployer-shared` npm package. Contains shared interfaces, Allure CLI wrapper, console notifier, and file utilities.
+- **`src/shared/utilities/get-report-stats.ts`** — Reads report statistics from `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
 
 ## Key Patterns
 
@@ -75,3 +102,4 @@ src/
 - **Sequential staging** — file copy and artifact download run sequentially to control memory on runners
 - **Graceful degradation** — if GitHub token lacks `actions: write`, history is skipped with a warning instead of failing
 - **Consistent logging** — all logging uses `@actions/core` (`info`, `warning`, `error`, `setFailed`) for proper GitHub Actions UI integration
+- **Config-driven report generation** — dynamically generated `allurerc.json` passed to `allure generate --config` for full control over plugins, history, and report options

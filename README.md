@@ -1,12 +1,23 @@
 # Allure Deployer Action
 
-Deploy Allure test reports to GitHub Pages with History and Report Aggregation.
+Deploy Allure 3 test reports to GitHub Pages with History, Report Aggregation, and a Summary Landing Page.
 
 **Supported Runners:**
 - `ubuntu-latest`
 - `macos-latest`
 - `windows-latest`
-- `Self-hosted runner` — ensure you have a Java runtime installed and [firewall rules configured](https://github.com/actions/toolkit/tree/main/packages/artifact#breaking-changes).
+- `Self-hosted runner` — ensure [firewall rules are configured](https://github.com/actions/toolkit/tree/main/packages/artifact#breaking-changes).
+
+## Features
+
+- Generates **Allure 3** reports (no Java required)
+- Deploys to **GitHub Pages** with unique URLs per run
+- **History tracking** across runs via GitHub Artifacts
+- **Summary landing page** at the GitHub Pages root listing all report prefixes with stats
+- **Clickable history** navigation between previous report runs
+- **PR comments** with test results summary
+- **Multi-project** support via `prefix` — multiple test suites on one GitHub Pages site
+- **Concurrent-safe** — parallel workflows can deploy different prefixes simultaneously
 
 ## Example 1: Deploy to GitHub Pages
 
@@ -19,18 +30,17 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v6
-      - name: Run test
-        run: #Run test and create allure results
-      - name: Deploy Reports to GitHub Pages with History
+      - name: Run tests
+        run: # Run tests that produce allure-results
+      - name: Deploy Allure Report
         uses: deivydasp/allure-deployer-action@v2
         with:
           allure_results_path: 'allure-results'
-          show_history: 'true'
 ```
 
 ---
 
-## Example 2: Print test report URL as Pull Request comment
+## Example 2: Pull Request comment with report link
 
 ```yaml
 on:
@@ -45,25 +55,34 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v6
-      - name: Run test
-        run: #Run test and create allure results
-      - name: Deploy Reports to GitHub Pages on Pull Request
+      - name: Run tests
+        run: # Run tests that produce allure-results
+      - name: Deploy Allure Report
         uses: deivydasp/allure-deployer-action@v2
         with:
-          pr_comment: 'true'
           allure_results_path: 'allure-results'
-          show_history: 'true'
-```
-
-PR comment example:
-```markdown
-**Test Report**: https://your-username.github.io/your-repo/123456
-| Passed | Broken | Skipped | Failed | Unknown |
-|--------|--------|---------|--------|---------|
-| 15     | 2      | 0       | 1      | 0       |
+          pr_comment: 'true'
 ```
 
 ---
+
+## Example 3: Multi-project setup
+
+```yaml
+- name: Deploy API tests
+  uses: deivydasp/allure-deployer-action@v2
+  with:
+    allure_results_path: 'api-test-results'
+    prefix: 'api-tests'
+
+- name: Deploy E2E tests
+  uses: deivydasp/allure-deployer-action@v2
+  with:
+    allure_results_path: 'e2e-test-results'
+    prefix: 'e2e-tests'
+```
+
+This creates separate report sections at `/api-tests/` and `/e2e-tests/` with a summary landing page at the root.
 
 ## More examples
 
@@ -83,10 +102,10 @@ PR comment example:
 | `github_pages_repo`   | GitHub repository to deploy GitHub Pages to. Format: `owner/repo`.                             | `github.repository` | No       |
 | `show_history`        | Display history from previous runs.                                                            | `true`              | No       |
 | `report_name`         | Custom name/title for the report.                                                              | —                   | No       |
-| `language`            | Allure report language.                                                                        | `en`                | No       |
+| `language`            | Allure report language.                                                                        | —                   | No       |
 | `custom_report_dir`   | Directory to copy the generated report into, for use in subsequent workflow steps.              | —                   | No       |
 | `prefix`              | Prefix to uniquely identify test report artifacts when managing multiple projects.              | —                   | No       |
-| `keep`                | Number of test reports to keep alive.                                                          | `10`                | No       |
+| `keep`                | Number of test reports to keep alive. Also limits history entries.                              | `10`                | No       |
 | `pr_comment`          | Post report info as a PR comment. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
 
 ## Outputs
@@ -99,10 +118,12 @@ PR comment example:
 ## Setup Notes
 
 - **GitHub Pages:**
-  - `github_token` must have `contents: write` (to push report files) and `actions: write` (to back up History as GitHub Artifacts).
+  - `github_token` must have `contents: write` (to push report files) and `actions: write` (to back up history as GitHub Artifacts).
   - GitHub Pages must be configured to deploy from the `github_pages_branch` (default: `gh-pages`).
 - **Pull Request Comments:**
   - `github_token` must have `pull_requests: write` and `issues: write`.
+- **No Java Required:**
+  - This action uses Allure 3 (`allure` npm package), which is pure JavaScript. No Java runtime needed.
 
 ## Contributing and Licensing
 
