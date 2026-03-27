@@ -25,6 +25,10 @@ on:
       report-name:
         description: 'Title of the report'
         default: 'Allure Report'
+      dashboard:
+        description: 'Enable dashboard with summary landing page'
+        type: boolean
+        default: true
       prefix:
         description: 'Prefix'
         default: 'local-action'
@@ -49,7 +53,7 @@ jobs:
           allure_results_path: 'allure-results'
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
-
+          dashboard: ${{ github.event.inputs.dashboard }}
 
   gh-multi:
     if: ${{ github.event.inputs.job == 'gh-multi' }}

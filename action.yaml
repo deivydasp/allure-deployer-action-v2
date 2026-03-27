@@ -46,6 +46,9 @@ inputs:
   github_pages_repo:
     description: "Another GitHub owner/repo to deploy GitHub pages. Ensure that 'github_token' provided has permissions to the repository"
     default: '${{ github.repository }}'
+  dashboard:
+    description: "Generate a dashboard alongside the detailed report with a summary landing page (true/false)"
+    default: "false"
   keep:
     description: "Number of test reports you want to keep alive"
     default: '10'

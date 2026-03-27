@@ -92,6 +92,7 @@ async function executeDeployment() {
             HISTORY_PATH: inputs.HISTORY_PATH,
             historyLimit: inputs.keep,
             showHistory: inputs.show_history,
+            dashboard: inputs.dashboard,
             reportName: inputs.report_name,
             reportLanguage: inputs.language,
         };

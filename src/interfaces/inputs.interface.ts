@@ -9,6 +9,7 @@ export interface Inputs {
     custom_report_dir?: string;
 
     language?: string;
+    dashboard: boolean;
     keep: number;
     prefix?: string;
 }
