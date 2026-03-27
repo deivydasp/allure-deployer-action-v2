@@ -4,7 +4,9 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const allureCli = path.join(path.dirname(require.resolve('allure/package.json')), 'cli.js');
+// allure's exports map only exposes ./dist/index.js, so resolve that and navigate up to cli.js
+const allureEntry = require.resolve('allure');
+const allureCli = path.join(allureEntry, '..', '..', 'cli.js');
 
 export class AllureService implements CommandRunner {
     runCommand(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
