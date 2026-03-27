@@ -61,7 +61,6 @@ export class Allure {
         ];
         if (this.config.showHistory) {
             command.push('--history-path', this.config.HISTORY_PATH);
-            command.push('--history-limit', this.config.historyLimit.toString());
         }
         if (this.config.reportName) {
             command.push('--report-name', this.config.reportName);
@@ -76,27 +75,37 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
 
-        if (this.config.showHistory && executor?.reportUrl) {
-            await this.patchHistoryUrl(executor.reportUrl);
-            await this.createHistoryRedirect();
+        if (this.config.showHistory) {
+            await this.postProcessHistory(executor?.reportUrl);
+            if (executor?.reportUrl) {
+                await this.createHistoryRedirect();
+            }
         }
 
         return this.config.REPORTS_DIR;
     }
 
     /**
-     * Patches the last history entry with the report URL so history dots link to previous reports.
+     * Patches the latest history entry with the report URL and truncates to the history limit.
      */
-    private async patchHistoryUrl(reportUrl: string): Promise<void> {
+    private async postProcessHistory(reportUrl?: string): Promise<void> {
         try {
             const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
-            const lines = content.trimEnd().split('\n');
-            const lastEntry = JSON.parse(lines[lines.length - 1]);
-            lastEntry.url = reportUrl;
-            lines[lines.length - 1] = JSON.stringify(lastEntry);
+            let lines = content.trimEnd().split('\n');
+
+            if (reportUrl) {
+                const lastEntry = JSON.parse(lines[lines.length - 1]);
+                lastEntry.url = reportUrl;
+                lines[lines.length - 1] = JSON.stringify(lastEntry);
+            }
+
+            if (lines.length > this.config.historyLimit) {
+                lines = lines.slice(-this.config.historyLimit);
+            }
+
             await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
         } catch (e) {
-            warning(`Failed to patch history URL: ${e}`);
+            warning(`Failed to post-process history: ${e}`);
         }
     }
 
