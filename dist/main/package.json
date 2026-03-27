@@ -1,6 +1,6 @@
 {
   "type": "module",
   "dependencies": {
-    "allure-commandline": "^2.38.1"
+    "allure": "^3.3.1"
   }
 }

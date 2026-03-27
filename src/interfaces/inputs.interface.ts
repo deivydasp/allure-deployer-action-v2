@@ -7,7 +7,7 @@ export interface Inputs {
     show_history: boolean;
     pr_comment: boolean;
     custom_report_dir?: string;
-    language: string;
+
     keep: number;
     prefix?: string;
 }

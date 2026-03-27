@@ -1,12 +1,14 @@
 import { CommandRunner } from '../interfaces/command.interface.js';
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import * as path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const allureCommandline = require('allure-commandline');
+const allureCli = path.join(path.dirname(require.resolve('allure/package.json')), 'cli.js');
 
 export class AllureService implements CommandRunner {
     runCommand(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-        const allureProcess = allureCommandline(args);
+        const allureProcess = spawn(process.execPath, [allureCli, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
         let stdout = '';
         let stderr = '';
 
@@ -20,8 +22,8 @@ export class AllureService implements CommandRunner {
             allureProcess.on('error', (error: Error) => {
                 reject(error);
             });
-            allureProcess.on('exit', (exitCode: number) => {
-                resolve({ exitCode, stdout, stderr });
+            allureProcess.on('exit', (exitCode: number | null) => {
+                resolve({ exitCode: exitCode ?? 1, stdout, stderr });
             });
         });
     }

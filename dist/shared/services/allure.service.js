@@ -1,9 +1,11 @@
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import * as path from 'node:path';
 const require = createRequire(import.meta.url);
-const allureCommandline = require('allure-commandline');
+const allureCli = path.join(path.dirname(require.resolve('allure/package.json')), 'cli.js');
 export class AllureService {
     runCommand(args) {
-        const allureProcess = allureCommandline(args);
+        const allureProcess = spawn(process.execPath, [allureCli, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
         let stdout = '';
         let stderr = '';
         return new Promise((resolve, reject) => {
@@ -17,7 +19,7 @@ export class AllureService {
                 reject(error);
             });
             allureProcess.on('exit', (exitCode) => {
-                resolve({ exitCode, stdout, stderr });
+                resolve({ exitCode: exitCode ?? 1, stdout, stderr });
             });
         });
     }

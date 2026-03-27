@@ -40,9 +40,6 @@ inputs:
   github_pages_branch:
     description: "Target branch for Deploying to GitHub Pages. Default: gh-pages"
     default: 'gh-pages'
-  language:
-    description: "Allure report language"
-    default: 'en'
   github_pages_repo:
     description: "Another GitHub owner/repo to deploy GitHub pages. Ensure that 'github_token' provided has permissions to the repository"
     default: '${{ github.repository }}'

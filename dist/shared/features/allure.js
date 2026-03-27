@@ -39,12 +39,11 @@ export class Allure {
         const command = [
             'generate',
             this.config.RESULTS_STAGING_PATH,
-            '--report-dir',
+            '--output',
             this.config.REPORTS_DIR,
-            '--clean',
         ];
-        if (this.config.reportLanguage) {
-            command.push('--report-language', this.config.reportLanguage);
+        if (this.config.reportName) {
+            command.push('--report-name', this.config.reportName);
         }
         const { exitCode } = await this.allureRunner.runCommand(command);
         if (exitCode !== 0) {

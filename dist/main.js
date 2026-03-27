@@ -68,7 +68,7 @@ async function executeDeployment() {
         const config = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
-            reportLanguage: inputs.language,
+            reportName: inputs.report_name,
         };
         const allure = new Allure({ config });
         await generateAllureReport({ allure, reportUrl });

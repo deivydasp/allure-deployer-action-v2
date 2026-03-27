@@ -14,7 +14,6 @@ function getInputOrUndefined(name) {
     }
 }
 const inputs = {
-    language: getTypedInput('language'),
     report_name: getInputOrUndefined('report_name'),
     custom_report_dir: getInputOrUndefined('custom_report_dir'),
     allure_results_path: getTypedInput('allure_results_path', true),
