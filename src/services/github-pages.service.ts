@@ -157,6 +157,10 @@ export class GithubPagesService implements GithubPagesInterface {
                         const summaryPath = path.join(latestDir, candidate);
                         if (fs.existsSync(summaryPath)) {
                             const summary = JSON.parse(await fs.promises.readFile(summaryPath, 'utf8'));
+                            // Normalize Allure v2 format (statistic) to v3 format (stats)
+                            if (!summary.stats && summary.statistic) {
+                                summary.stats = summary.statistic;
+                            }
                             summary.name = summary.name ?? entry.name;
                             summary.href = `${entry.name}/`;
                             summaries.push(summary);
