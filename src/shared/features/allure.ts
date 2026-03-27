@@ -9,7 +9,9 @@ import { AllureService } from '../services/allure.service.js';
 export interface AllureConfig {
     RESULTS_STAGING_PATH: string;
     REPORTS_DIR: string;
+    HISTORY_PATH: string;
     reportName?: string;
+    reportLanguage?: string;
 }
 
 export class Allure {
@@ -49,14 +51,22 @@ export class Allure {
             await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
 
+        // Build history from results (appends to history.jsonl)
+        await this.buildHistory();
+
         const command = [
-            'generate',
+            'awesome',
             this.config.RESULTS_STAGING_PATH,
             '--output',
             this.config.REPORTS_DIR,
+            '--history-path',
+            this.config.HISTORY_PATH,
         ];
         if (this.config.reportName) {
             command.push('--report-name', this.config.reportName);
+        }
+        if (this.config.reportLanguage) {
+            command.push('--report-language', this.config.reportLanguage);
         }
 
         const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
@@ -65,5 +75,21 @@ export class Allure {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
         return this.config.REPORTS_DIR;
+    }
+
+    private async buildHistory(): Promise<void> {
+        const command = [
+            'history',
+            this.config.RESULTS_STAGING_PATH,
+            '--history-path',
+            this.config.HISTORY_PATH,
+        ];
+        if (this.config.reportName) {
+            command.push('--report-name', this.config.reportName);
+        }
+        const { exitCode, stderr } = await this.allureRunner.runCommand(command);
+        if (exitCode !== 0) {
+            info(`History generation skipped: ${stderr}`);
+        }
     }
 }

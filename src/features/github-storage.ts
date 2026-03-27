@@ -16,6 +16,7 @@ export interface GithubStorageConfig {
     RESULTS_STAGING_PATH: string;
     ARCHIVE_DIR: string;
     REPORTS_DIR: string;
+    HISTORY_PATH: string;
 }
 
 export class GithubStorage implements IStorage {
@@ -135,29 +136,22 @@ export class GithubStorage implements IStorage {
             destination: this.args.ARCHIVE_DIR,
         });
         if (downloadedPaths.length > 0) {
-            const stagingDir = path.join(this.args.RESULTS_STAGING_PATH, 'history');
-            await fs.mkdir(stagingDir, { recursive: true });
-            tasks.push(this.unzipToStaging(downloadedPaths[0], stagingDir));
+            const historyDir = path.dirname(this.args.HISTORY_PATH);
+            await fs.mkdir(historyDir, { recursive: true });
+            tasks.push(this.unzipToStaging(downloadedPaths[0], historyDir));
         }
         await allFulfilledResults(tasks);
     }
 
     /**
-     * Returns the path for the history folder.
-     */
-    private getHistoryFolder(): string {
-        return path.join(this.args.REPORTS_DIR, 'history');
-    }
-
-    /**
-     * Zips and uploads the history archive to the remote storage.
+     * Uploads the history.jsonl file to the remote storage.
      */
     private async uploadHistory(): Promise<void> {
         try {
-            await fs.access(this.getHistoryFolder());
-            await this.provider.upload(this.getHistoryFolder(), this.HISTORY_ARCHIVE_NAME);
+            await fs.access(this.args.HISTORY_PATH);
+            await this.provider.upload(this.args.HISTORY_PATH, this.HISTORY_ARCHIVE_NAME);
         } catch {
-            warning('No history folder found in report output. History upload skipped.');
+            warning('No history file found. History upload skipped.');
         }
     }
 

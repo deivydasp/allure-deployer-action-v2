@@ -17,6 +17,7 @@ function getInputOrUndefined<T extends input>(name: T): Inputs[T] | undefined {
 }
 
 const inputs: Inputs & DefaultConfig = {
+    language: getInputOrUndefined('language'),
     report_name: getInputOrUndefined('report_name'),
     custom_report_dir: getInputOrUndefined('custom_report_dir'),
     allure_results_path: getTypedInput('allure_results_path', true),
@@ -30,6 +31,7 @@ const inputs: Inputs & DefaultConfig = {
     fileProcessingConcurrency: 10,
     RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
     ARCHIVE_DIR: path.join(runtimeDir(), 'archive'),
+    HISTORY_PATH: path.join(runtimeDir(), 'history.jsonl'),
     WORKSPACE: workspace(),
 };
 

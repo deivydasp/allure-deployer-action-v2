@@ -68,7 +68,9 @@ async function executeDeployment() {
         const config = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
+            HISTORY_PATH: inputs.HISTORY_PATH,
             reportName: inputs.report_name,
+            reportLanguage: inputs.language,
         };
         const allure = new Allure({ config });
         await generateAllureReport({ allure, reportUrl });
@@ -105,6 +107,7 @@ async function initializeStorage(owner, repo, reportDir) {
             ARCHIVE_DIR: inputs.ARCHIVE_DIR,
             REPORTS_DIR: reportDir,
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
+            HISTORY_PATH: inputs.HISTORY_PATH,
             fileProcessingConcurrency: inputs.fileProcessingConcurrency,
             showHistory: inputs.show_history,
         };
