@@ -49,8 +49,8 @@ export class GitHubNotifier implements Notifier {
             ? `<a href="${data.reportUrl}" target="_blank">View</a>`
             : '';
 
-        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" alt="Allure" align="absmiddle">`;
-        let message = `| | ${logo} Name | Duration | Stats | Total | Report |\n`;
+        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="28" height="28" alt="Allure" align="absmiddle">`;
+        let message = `| ${logo} | Name | Duration | Stats | Total | Report |\n`;
         message += `|-|-|-|-|-|-|\n`;
         message += `| ${pie} | ${reportName} | ${duration} | ${stats} | ${total} | ${reportLink} |\n`;
 
