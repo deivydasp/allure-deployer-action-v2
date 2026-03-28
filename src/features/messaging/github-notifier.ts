@@ -49,8 +49,7 @@ export class GitHubNotifier implements Notifier {
             ? `<a href="${data.reportUrl}" target="_blank">View</a>`
             : '';
 
-        let message = `## Allure Report Summary\n`;
-        message += `| | Name | Duration | Stats | Total | Report |\n`;
+        let message = `| | Name | Duration | Stats | Total | Report |\n`;
         message += `|-|-|-|-|-|-|\n`;
         message += `| ${pie} | ${reportName} | ${duration} | ${stats} | ${total} | ${reportLink} |\n`;
 
