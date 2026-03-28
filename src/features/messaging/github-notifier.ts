@@ -45,14 +45,14 @@ export class GitHubNotifier implements Notifier {
 
         const reportName = data.reportName ?? 'Allure Report';
         const duration = data.duration ? this.formatDuration(data.duration) : '';
-        const reportLink = data.reportUrl
-            ? `<a href="${data.reportUrl}" target="_blank">View</a>`
+        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="16" height="16" alt="Allure" align="absmiddle">`;
+        const reportCol = data.reportUrl
+            ? `<a href="${data.reportUrl}" target="_blank">${logo}&nbsp;View</a>`
             : '';
 
-        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="28" height="28" alt="Allure" align="absmiddle">`;
-        let message = `| ${logo} | Name | Duration | Stats | Total | Report |\n`;
+        let message = `| | Name | Duration | Stats | Total | Report |\n`;
         message += `|-|-|-|-|-|-|\n`;
-        message += `| ${pie} | ${reportName} | ${duration} | ${stats} | ${total} | ${reportLink} |\n`;
+        message += `| ${pie} | ${reportName} | ${duration} | ${stats} | ${total} | ${reportCol} |\n`;
 
         const promises: Promise<void>[] = [];
         if (data.reportUrl) {

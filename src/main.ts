@@ -78,6 +78,7 @@ export async function main() {
 
         await mkdir(reportDir, { recursive: true, mode: 0o755 });
 
+        const startTime = Date.now();
         const resultPaths = await validateResultsPaths(inputs.allure_results_path);
         const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
         const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
@@ -98,7 +99,7 @@ export async function main() {
             reportUrl,
             environment: allure.readEnvironments(),
             reportName: inputs.report_name,
-            duration: reportStats.duration,
+            duration: Date.now() - startTime,
         });
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
