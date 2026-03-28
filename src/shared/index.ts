@@ -18,5 +18,5 @@ export { AllureService } from './services/allure.service.js';
 // Utilities
 export { NotifyHandler } from './utilities/notify-handler.js';
 export { validateResultsPaths } from './utilities/validate-results-paths.js';
-export { getReportStats } from './utilities/get-report-stats.js';
+export { getReportStats, getTestDuration } from './utilities/get-report-stats.js';
 export { copyFiles } from './utilities/copy-files.js';
