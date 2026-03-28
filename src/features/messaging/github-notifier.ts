@@ -23,16 +23,37 @@ export class GitHubNotifier implements Notifier {
 
     async notify(data: NotificationData): Promise<void> {
         const { passed, failed, broken, skipped, unknown } = data.resultStatus;
+        const total = passed + failed + broken + skipped + unknown;
 
-        const logo = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" alt="Allure" align="absmiddle">`;
-        let message = '';
-        if (data.reportUrl) {
-            message += `${logo}&nbsp;**Test Report**: [${data.reportUrl}](${data.reportUrl})\n`;
-        }
+        const chartUrl = `https://allurecharts.qameta.workers.dev`;
+        const pie = `<img src="${chartUrl}/pie?passed=${passed}&failed=${failed}&broken=${broken}&skipped=${skipped}&unknown=${unknown}&size=32" width="28" height="28" />`;
 
-        message += `\n| 🟢 **Passed** | 🔴 **Failed** | 🟡 **Broken** | ⚪ **Skipped** | 🟣 **Unknown** |\n`;
-        message += `|---|---|---|---|---|\n`;
-        message += `| ${passed} | ${failed} | ${broken} | ${skipped} | ${unknown} |\n`;
+        const dot = (type: string, count: number) =>
+            count > 0
+                ? `<img alt="${type}" src="${chartUrl}/dot?type=${type}&size=8" />&nbsp;${count}`
+                : '';
+
+        const stats = [
+            dot('passed', passed),
+            dot('failed', failed),
+            dot('broken', broken),
+            dot('skipped', skipped),
+            dot('unknown', unknown),
+        ]
+            .filter(Boolean)
+            .join('&nbsp;&nbsp;&nbsp;');
+
+        const reportName = data.reportName ?? 'Allure Report';
+        const duration = data.duration ? this.formatDuration(data.duration) : '';
+        const reportLink = data.reportUrl
+            ? `<a href="${data.reportUrl}" target="_blank">View</a>`
+            : '';
+
+        let message = `## Allure Report Summary\n`;
+        message += `| | Name | Duration | Stats | Total | Report |\n`;
+        message += `|-|-|-|-|-|-|\n`;
+        message += `| ${pie} | ${reportName} | ${duration} | ${stats} | ${total} | ${reportLink} |\n`;
+
         const promises: Promise<void>[] = [];
         if (data.reportUrl) {
             promises.push(this.client.updateOutput({ name: 'report_url', value: data.reportUrl }));
@@ -42,5 +63,14 @@ export class GitHubNotifier implements Notifier {
         }
         promises.push(this.client.updateSummary(message.trim()));
         await Promise.allSettled(promises);
+    }
+
+    private formatDuration(ms: number): string {
+        const s = Math.floor(ms / 1000);
+        if (s < 60) return `${s}s`;
+        const m = Math.floor(s / 60);
+        if (m < 60) return `${m}m ${s % 60}s`;
+        const h = Math.floor(m / 60);
+        return `${h}h ${m % 60}m`;
     }
 }

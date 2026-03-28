@@ -8,26 +8,55 @@ async function readJsonFile(filePath: string): Promise<any> {
     return JSON.parse(fileContents);
 }
 
-export async function getReportStats(reportDir: string): Promise<ReportStatistic> {
-    // Single-plugin: widgets/statistic.json at root
-    // Multi-plugin: awesome/widgets/statistic.json in plugin subdirectory
-    const candidates = [
-        path.join(reportDir, 'widgets', 'statistic.json'),
-        path.join(reportDir, 'awesome', 'widgets', 'statistic.json'),
+export interface ReportStats {
+    statistic: ReportStatistic;
+    duration?: number;
+}
+
+export async function getReportStats(reportDir: string): Promise<ReportStats> {
+    // Try summary.json first (has both stats and duration)
+    const summaryCandidates = [
+        path.join(reportDir, 'summary.json'),
+        path.join(reportDir, 'awesome', 'summary.json'),
     ];
-    for (const statsPath of candidates) {
+    for (const summaryPath of summaryCandidates) {
         try {
-            const statistic = await readJsonFile(statsPath);
+            const summary = await readJsonFile(summaryPath);
             return {
-                passed: statistic.passed ?? 0,
-                broken: statistic.broken ?? 0,
-                failed: statistic.failed ?? 0,
-                skipped: statistic.skipped ?? 0,
-                unknown: statistic.unknown ?? 0,
+                statistic: {
+                    passed: summary.stats?.passed ?? 0,
+                    broken: summary.stats?.broken ?? 0,
+                    failed: summary.stats?.failed ?? 0,
+                    skipped: summary.stats?.skipped ?? 0,
+                    unknown: summary.stats?.unknown ?? 0,
+                },
+                duration: summary.duration,
             };
         } catch {
             // try next candidate
         }
     }
-    throw new Error(`Failed to read report statistics. Checked: ${candidates.join(', ')}`);
+
+    // Fallback to statistic.json (no duration)
+    const statCandidates = [
+        path.join(reportDir, 'widgets', 'statistic.json'),
+        path.join(reportDir, 'awesome', 'widgets', 'statistic.json'),
+    ];
+    for (const statsPath of statCandidates) {
+        try {
+            const statistic = await readJsonFile(statsPath);
+            return {
+                statistic: {
+                    passed: statistic.passed ?? 0,
+                    broken: statistic.broken ?? 0,
+                    failed: statistic.failed ?? 0,
+                    skipped: statistic.skipped ?? 0,
+                    unknown: statistic.unknown ?? 0,
+                },
+            };
+        } catch {
+            // try next candidate
+        }
+    }
+    throw new Error(`Failed to read report statistics from ${reportDir}`);
 }

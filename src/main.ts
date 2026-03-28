@@ -23,7 +23,6 @@ import {
     NotificationData,
     Notifier,
     NotifyHandler,
-    ReportStatistic,
     validateResultsPaths,
 } from './shared/index.js';
 import { copyDirectory } from './utilities/util.js';
@@ -93,8 +92,14 @@ export async function main() {
         };
         const allure = new Allure({ config });
         await generateAllureReport({ allure, reportUrl });
-        const [resultsStats] = await finalizeDeployment({ host, storage, reportDir });
-        await sendNotifications(resultsStats, reportUrl, allure.readEnvironments());
+        const [reportStats] = await finalizeDeployment({ host, storage, reportDir });
+        await sendNotifications({
+            resultStatus: reportStats.statistic,
+            reportUrl,
+            environment: allure.readEnvironments(),
+            reportName: inputs.report_name,
+            duration: reportStats.duration,
+        });
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
     }
@@ -221,7 +226,7 @@ async function finalizeDeployment({
     reportDir: string;
 }) {
     info('Finalizing deployment...');
-    const result: [ReportStatistic, void, void, void] = await Promise.all([
+    const result = await Promise.all([
         getReportStats(reportDir),
         host.deploy(),
         storage?.uploadArtifacts(),
@@ -241,13 +246,12 @@ async function copyReportToCustomDir(reportDir: string): Promise<void> {
     }
 }
 
-async function sendNotifications(resultStatus: ReportStatistic, reportUrl?: string, environment?: Map<string, string>) {
+async function sendNotifications(data: NotificationData) {
     const notifiers: Notifier[] = [new ConsoleNotifier()];
     const token = inputs.github_token;
     const prNumber = github.context.payload.pull_request?.number;
     const prComment = inputs.pr_comment;
     const githubNotifierClient = new GitHubService();
     notifiers.push(new GitHubNotifier({ client: githubNotifierClient, token, prNumber, prComment }));
-    const notificationData: NotificationData = { resultStatus, reportUrl, environment };
-    await new NotifyHandler(notifiers).sendNotifications(notificationData);
+    await new NotifyHandler(notifiers).sendNotifications(data);
 }
