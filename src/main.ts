@@ -101,6 +101,7 @@ async function runSummaryMode() {
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
 
         // Clone gh-pages (read-only)
+        await mkdir(inputs.WORKSPACE, { recursive: true });
         const host = getGitHubHost({
             token: inputs.github_token,
             owner,
