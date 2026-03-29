@@ -42,13 +42,24 @@ Key details:
 - **History**: Uses JSONL format (`history.jsonl`) stored as GitHub Artifacts. The `allure awesome` plugin reads/appends history via `--history-path` config. Post-generation, history is truncated to the `keep` limit and patched with the report URL for clickable history links.
 - **History redirect**: Creates `awesome/index.html` redirect in single-plugin reports because Allure 3's awesome theme appends `/awesome` to history URLs
 
-### Deployment Flow (src/main.ts)
+### Two Modes (src/main.ts)
 
+The action has two modes controlled by the `mode` input:
+
+**Deploy mode** (`mode: deploy`, default):
 1. **Validate** — Checks GitHub token, verifies Pages is configured for the target branch
 2. **Stage** — Copies allure-results to staging, downloads history.jsonl from GitHub Artifacts (runs sequentially to avoid memory spikes)
 3. **Generate** — Uses `allure generate --config allurerc.json` via `src/shared/features/allure.ts` to produce the HTML report, then post-processes history (URL patching + truncation)
-4. **Deploy** — `prepareAndCommit` (delete old reports, redirect page, summary page, stage, commit), then push with retry. On push rejection (concurrent workflows), resets to latest remote, restores report from backup, re-runs `prepareAndCommit`, and pushes again. Upload history artifact and copy to custom dir run in parallel.
-5. **Notify** — Console, GitHub PR comment, and Actions job summary
+4. **Metadata** — Writes `deploy.json` to the report directory with `runId`, `runAttempt`, `wallClockDuration`, `timestamp` for summary mode and re-run tracking
+5. **Deploy** — `prepareAndCommit` (delete old reports, redirect page, summary page, stage, commit), then push with retry. On push rejection (concurrent workflows), resets to latest remote, restores report from backup, re-runs `prepareAndCommit`, and pushes again. Upload history artifact and copy to custom dir run in parallel.
+6. **Notify** — Console, GitHub PR comment, and Actions job summary (skipped when `summary: false`)
+
+**Summary mode** (`mode: summary`):
+1. **Validate** — Same GitHub Pages validation as deploy mode
+2. **Clone** — Shallow clone of gh-pages branch (read-only)
+3. **Scan** — Reads `summary.json` and `deploy.json` from each prefix's latest report directory. Detects re-runs by matching `runId` across report dirs. In pipeline mode (`prefixes` specified), shows "Not deployed" for expected prefixes that weren't deployed in this run.
+4. **Render** — Builds a combined summary table with pie charts, status dots, duration, and report links. Dynamic "Rerun #N" columns appear when re-runs are detected.
+5. **Write** — Writes the table to `GITHUB_STEP_SUMMARY`
 
 ### Root Summary Page
 
@@ -72,6 +83,7 @@ src/
 │   └── github.service.ts             # GitHub API (PR comments, outputs, summaries)
 ├── utilities/
 │   ├── util.ts                       # Retry logic, file helpers
+│   ├── summary-table.ts              # Summary table rendering (pie charts, dots, rerun columns)
 │   └── cleanup.ts                    # Post-action cleanup (no-op)
 └── shared/                           # Inlined abstractions (formerly allure-deployer-shared)
     ├── index.ts                      # Barrel export
@@ -103,3 +115,5 @@ scripts/
 - **Graceful degradation** — if GitHub token lacks `actions: write`, history is skipped with a warning instead of failing
 - **Consistent logging** — all logging uses `@actions/core` (`info`, `warning`, `error`, `setFailed`) for proper GitHub Actions UI integration
 - **Config-driven report generation** — dynamically generated `allurerc.json` passed to `allure generate --config` for full control over plugins, history, and report options
+- **Deploy metadata** — `deploy.json` written to each report directory with `runId`, `runAttempt`, `wallClockDuration`, `timestamp` for summary mode duration and re-run tracking
+- **Summary table** — shared `buildSummaryTable()` utility used by both deploy mode (single row) and summary mode (multi-row). Uses allure's public chart worker for pie/dot images. Dynamic rerun columns only appear when re-runs detected.
