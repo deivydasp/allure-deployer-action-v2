@@ -2,7 +2,7 @@ import { endGroup, error, info, setFailed, startGroup, warning } from '@actions/
 import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, stat } from 'fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
 import { GithubStorage, GithubStorageConfig } from './features/github-storage.js';
@@ -81,13 +81,15 @@ async function runDeployMode() {
         };
         const allure = new Allure({ config });
         await generateAllureReport({ allure, reportUrl });
+        const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
+        await writeDeployMeta(reportDir, wallClockDuration);
         const [reportStats] = await finalizeDeployment({ host, storage, reportDir });
         await sendNotifications({
             resultStatus: reportStats.statistic,
             reportUrl,
             environment: allure.readEnvironments(),
             reportName: inputs.report_name,
-            duration: await getTestDuration(inputs.RESULTS_STAGING_PATH),
+            duration: wallClockDuration,
         });
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
@@ -251,6 +253,23 @@ async function generateAllureReport({ allure, reportUrl }: { allure: Allure; rep
     info('Report generated successfully!');
 }
 
+export interface DeployMeta {
+    runId: number;
+    runAttempt: number;
+    wallClockDuration?: number;
+    timestamp: number;
+}
+
+async function writeDeployMeta(reportDir: string, wallClockDuration?: number): Promise<void> {
+    const meta: DeployMeta = {
+        runId: github.context.runId,
+        runAttempt: github.context.runAttempt,
+        wallClockDuration,
+        timestamp: Date.now(),
+    };
+    await writeFile(path.join(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
+}
+
 function createExecutor(reportUrl?: string): ExecutorInterface {
     const buildName = `GitHub Run ID: ${github.context.runId}`;
     const reportName = inputs.report_name;
@@ -320,6 +339,7 @@ async function scanPrefixSummaries(
     pagesSourcePath: string,
 ): Promise<SummaryRow[]> {
     const rows: SummaryRow[] = [];
+    const currentRunId = github.context.runId;
 
     let entries: string[];
     try {
@@ -340,7 +360,7 @@ async function scanPrefixSummaries(
         const entryStat = await stat(prefixDir).catch(() => null);
         if (!entryStat?.isDirectory()) continue;
 
-        // Find latest numeric run dir
+        // Find all numeric run dirs (newest first)
         const runs = await readdir(prefixDir).catch(() => [] as string[]);
         const runDirs = runs
             .filter((r) => /^\d+$/.test(r))
@@ -348,7 +368,30 @@ async function scanPrefixSummaries(
 
         if (runDirs.length === 0) continue;
 
-        const latestDir = path.join(prefixDir, runDirs[0]);
+        // Read deploy.json from all dirs to find runs matching current runId
+        const deployMetas: { dir: string; meta: DeployMeta }[] = [];
+        for (const dir of runDirs) {
+            const metaPath = path.join(prefixDir, dir, 'deploy.json');
+            try {
+                if (existsSync(metaPath)) {
+                    const meta: DeployMeta = JSON.parse(await readFile(metaPath, 'utf8'));
+                    if (meta.runId === currentRunId) {
+                        deployMetas.push({ dir, meta });
+                    }
+                }
+            } catch {
+                // skip unreadable meta
+            }
+        }
+
+        // Sort by attempt (ascending): attempt 1 is the "Report", rest are "Rerun #N"
+        deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
+
+        // Use the latest run dir for stats (either latest from current runId, or just the latest overall)
+        const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
+        const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
+
+        const latestDir = path.join(prefixDir, primaryDir);
         for (const candidate of ['summary.json', 'awesome/summary.json']) {
             const summaryPath = path.join(latestDir, candidate);
             if (!existsSync(summaryPath)) continue;
@@ -357,10 +400,30 @@ async function scanPrefixSummaries(
                 const summaryStats = summary.stats ?? summary.statistic;
                 if (!summaryStats) continue;
 
-                const reportSubDir = path.join(pagesSourcePath, entryName, runDirs[0]);
+                const reportSubDir = path.join(pagesSourcePath, entryName, primaryDir);
+
+                // Build rerun links from earlier attempts
+                const reruns: import('./utilities/summary-table.js').RerunInfo[] = [];
+                if (deployMetas.length > 1) {
+                    // First attempt is the "Report" link; subsequent are reruns
+                    for (let i = 1; i < deployMetas.length; i++) {
+                        const rerunDir = path.join(pagesSourcePath, entryName, deployMetas[i].dir);
+                        reruns.push({
+                            attempt: deployMetas[i].meta.runAttempt,
+                            url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
+                        });
+                    }
+                }
+
+                // Use first attempt as the Report link when reruns exist
+                const reportDir =
+                    deployMetas.length > 1
+                        ? path.join(pagesSourcePath, entryName, deployMetas[0].dir)
+                        : reportSubDir;
+
                 rows.push({
                     reportName: summary.name ?? entryName,
-                    reportUrl: normalizeUrl(`${pagesUrl}/${reportSubDir}`),
+                    reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
                     stats: {
                         passed: summaryStats.passed ?? 0,
                         broken: summaryStats.broken ?? 0,
@@ -368,8 +431,8 @@ async function scanPrefixSummaries(
                         skipped: summaryStats.skipped ?? 0,
                         unknown: summaryStats.unknown ?? 0,
                     },
-                    // summary.duration is cumulative test time, not wall-clock;
-                    // omit to avoid confusion (wall-clock is only available at deploy time)
+                    duration: primaryMeta?.wallClockDuration,
+                    reruns: reruns.length > 0 ? reruns : undefined,
                 });
                 break;
             } catch (e) {

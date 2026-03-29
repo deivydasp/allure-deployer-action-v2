@@ -3,11 +3,17 @@ import { ReportStatistic } from '../shared/index.js';
 // Allure's public Cloudflare worker for pie/dot chart images (same as allure-action uses)
 const CHART_URL = 'https://allurecharts.qameta.workers.dev';
 
+export interface RerunInfo {
+    attempt: number;
+    url: string;
+}
+
 export interface SummaryRow {
     reportName: string;
     reportUrl?: string;
     stats: ReportStatistic;
     duration?: number;
+    reruns?: RerunInfo[];
 }
 
 function formatDuration(ms: number): string {
@@ -19,7 +25,7 @@ function formatDuration(ms: number): string {
     return `${h}h ${m % 60}m`;
 }
 
-function buildRow(row: SummaryRow): string {
+function buildRow(row: SummaryRow, maxReruns: number): string {
     const { passed, failed, broken, skipped, unknown } = row.stats;
     const total = passed + failed + broken + skipped + unknown;
 
@@ -45,11 +51,29 @@ function buildRow(row: SummaryRow): string {
         ? `<a href="${row.reportUrl}" target="_blank">View</a>`
         : '';
 
-    return `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total} | ${reportCol} |`;
+    let result = `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total} | ${reportCol}`;
+
+    // Add rerun columns
+    for (let i = 1; i <= maxReruns; i++) {
+        const rerun = row.reruns?.find((r) => r.attempt === i + 1);
+        result += ` | ${rerun ? `<a href="${rerun.url}" target="_blank">View</a>` : '—'}`;
+    }
+
+    return `${result} |`;
 }
 
 export function buildSummaryTable(rows: SummaryRow[]): string {
-    const header = `| | Name | Duration | Stats | Total | Report |\n|-|-|-|-|-|-|`;
-    const tableRows = rows.map(buildRow).join('\n');
-    return `${header}\n${tableRows}`;
+    const maxReruns = Math.max(0, ...rows.map((r) => r.reruns?.length ?? 0));
+
+    let header = `| | Name | Duration | Stats | Total | Report`;
+    let separator = `|-|-|-|-|-|-`;
+    for (let i = 1; i <= maxReruns; i++) {
+        header += ` | Rerun #${i}`;
+        separator += `|-`;
+    }
+    header += ` |`;
+    separator += `|`;
+
+    const tableRows = rows.map((r) => buildRow(r, maxReruns)).join('\n');
+    return `${header}\n${separator}\n${tableRows}`;
 }
