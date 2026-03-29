@@ -6,8 +6,8 @@ export class GitHubService {
         try {
             setOutput(name, value);
         }
-        catch (_e) {
-            // ignore
+        catch (e) {
+            warning(`Failed to set output '${name}': ${e}`);
         }
     }
     async updatePr({ message, token, prNumber }) {
@@ -29,6 +29,11 @@ export class GitHubService {
         }
     }
     async updateSummary(message) {
-        await summary.addRaw(message, true).write();
+        try {
+            await summary.addRaw(message, true).write();
+        }
+        catch (e) {
+            warning(`Failed to write job summary: ${e}`);
+        }
     }
 }

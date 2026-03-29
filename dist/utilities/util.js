@@ -26,8 +26,11 @@ export function isRetryableError(error) {
         message.includes('rate limit') ||
         message.includes('timeout') ||
         message.includes('network error') ||
+        // Git push rejection — match loosely to handle different git versions/locales
         message.includes('tip of your current branch is behind') ||
-        message.includes('failed to push some refs'));
+        message.includes('failed to push some refs') ||
+        message.includes('non-fast-forward') ||
+        message.includes('[rejected]'));
 }
 /**
  * Utility function to implement retry logic with exponential backoff
@@ -48,11 +51,12 @@ export async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
             }
             // If this was our last attempt, throw the error
             if (attempt === config.maxRetries) {
-                throw new Error(`Failed after ${config.maxRetries} attempts. Last error: ${error?.message || 'Unknown error'}`);
+                throw new Error(`Failed after ${config.maxRetries} attempts. Last error: ${error?.message || 'Unknown error'}`, { cause: error });
             }
-            warning(`Attempt ${attempt} failed. Retrying in ${delay}ms. Error: ${error.message}`);
-            // Wait before retrying
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            // Add jitter: randomize between 50%-100% of delay to prevent thundering herd
+            const jitteredDelay = Math.floor(delay * (0.5 + Math.random() * 0.5));
+            warning(`Attempt ${attempt} failed. Retrying in ${jitteredDelay}ms. Error: ${error.message}`);
+            await new Promise((resolve) => setTimeout(resolve, jitteredDelay));
             // Calculate next delay with exponential backoff
             delay = Math.min(delay * config.backoffFactor, config.maxDelay);
         }

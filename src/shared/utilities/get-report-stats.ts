@@ -28,7 +28,7 @@ export async function getTestDuration(resultsDir: string): Promise<number | unde
                 // skip malformed result files
             }
         }
-        if (minStart < Infinity && maxStop > 0) {
+        if (minStart < Infinity && maxStop > 0 && maxStop >= minStart) {
             return maxStop - minStart;
         }
     } catch {
@@ -51,16 +51,19 @@ export async function getReportStats(reportDir: string): Promise<ReportStats> {
     for (const summaryPath of summaryCandidates) {
         try {
             const summary = await readJsonFile(summaryPath);
-            return {
-                statistic: {
-                    passed: summary.stats?.passed ?? 0,
-                    broken: summary.stats?.broken ?? 0,
-                    failed: summary.stats?.failed ?? 0,
-                    skipped: summary.stats?.skipped ?? 0,
-                    unknown: summary.stats?.unknown ?? 0,
-                },
-                duration: summary.duration,
-            };
+            const stats = summary.stats ?? summary.statistic;
+            if (stats) {
+                return {
+                    statistic: {
+                        passed: stats.passed ?? 0,
+                        broken: stats.broken ?? 0,
+                        failed: stats.failed ?? 0,
+                        skipped: stats.skipped ?? 0,
+                        unknown: stats.unknown ?? 0,
+                    },
+                    duration: summary.duration,
+                };
+            }
         } catch {
             // try next candidate
         }

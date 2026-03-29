@@ -1,14 +1,17 @@
 import { Order } from '../shared/index.js';
 import path from 'node:path';
-import fs from 'fs/promises';
+import { access, mkdir } from 'node:fs/promises';
+import { createReadStream, createWriteStream, mkdirSync } from 'node:fs';
 import pLimit from 'p-limit';
-import fsSync from 'fs';
 import unzipper from 'unzipper';
 import { RequestError } from '@octokit/request-error';
 import { warning } from '@actions/core';
 import inputs from '../io.js';
 import { allFulfilledResults } from '../utilities/util.js';
 export class GithubStorage {
+    provider;
+    args;
+    HISTORY_ARCHIVE_NAME;
     constructor(provider, args) {
         this.provider = provider;
         this.args = args;
@@ -21,19 +24,25 @@ export class GithubStorage {
         }
     }
     unzipToStaging(zipFilePath, outputDir) {
+        const resolvedOutput = path.resolve(outputDir);
         return new Promise((resolve, reject) => {
             const writePromises = [];
-            fsSync
-                .createReadStream(zipFilePath)
+            createReadStream(zipFilePath)
                 .pipe(unzipper.Parse())
                 .on('entry', (entry) => {
                 if (entry.type === 'Directory') {
                     entry.autodrain();
                     return;
                 }
-                const fullPath = path.join(outputDir, entry.path);
+                const fullPath = path.resolve(outputDir, entry.path);
+                if (!fullPath.startsWith(resolvedOutput + path.sep)) {
+                    warning(`Skipping zip entry with path traversal: ${entry.path}`);
+                    entry.autodrain();
+                    return;
+                }
+                mkdirSync(path.dirname(fullPath), { recursive: true });
                 const writePromise = new Promise((res, rej) => {
-                    const writeStream = fsSync.createWriteStream(fullPath);
+                    const writeStream = createWriteStream(fullPath);
                     writeStream.on('finish', res);
                     writeStream.on('error', (err) => {
                         entry.autodrain();
@@ -53,7 +62,7 @@ export class GithubStorage {
                 }
             })
                 .on('error', (err) => {
-                warning('Unzip file error');
+                warning(`Unzip file error: ${err.message}`);
                 reject(err);
             });
         });
@@ -69,8 +78,8 @@ export class GithubStorage {
      */
     async createStagingDirectories() {
         await Promise.all([
-            fs.mkdir(this.args.ARCHIVE_DIR, { recursive: true }),
-            fs.mkdir(this.args.RESULTS_STAGING_PATH, { recursive: true }),
+            mkdir(this.args.ARCHIVE_DIR, { recursive: true }),
+            mkdir(this.args.RESULTS_STAGING_PATH, { recursive: true }),
         ]);
     }
     /**
@@ -113,7 +122,7 @@ export class GithubStorage {
         });
         if (downloadedPaths.length > 0) {
             const historyDir = path.dirname(this.args.HISTORY_PATH);
-            await fs.mkdir(historyDir, { recursive: true });
+            await mkdir(historyDir, { recursive: true });
             tasks.push(this.unzipToStaging(downloadedPaths[0], historyDir));
         }
         await allFulfilledResults(tasks);
@@ -123,7 +132,7 @@ export class GithubStorage {
      */
     async uploadHistory() {
         try {
-            await fs.access(this.args.HISTORY_PATH);
+            await access(this.args.HISTORY_PATH);
         }
         catch {
             warning('No history file found. History upload skipped.');

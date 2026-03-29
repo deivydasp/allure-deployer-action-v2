@@ -1,4 +1,5 @@
 export class GithubHost {
+    client;
     constructor(client) {
         this.client = client;
     }

@@ -7,8 +7,8 @@ export class GitHubService implements GithubInterface {
     async updateOutput({ name, value }: { name: string; value: string }): Promise<void> {
         try {
             setOutput(name, value);
-        } catch (_e) {
-            // ignore
+        } catch (e) {
+            warning(`Failed to set output '${name}': ${e}`);
         }
     }
     async updatePr({ message, token, prNumber }: { message: string; token: string; prNumber: number }): Promise<void> {
@@ -29,6 +29,10 @@ export class GitHubService implements GithubInterface {
         }
     }
     async updateSummary(message: string): Promise<void> {
-        await summary.addRaw(message, true).write();
+        try {
+            await summary.addRaw(message, true).write();
+        } catch (e) {
+            warning(`Failed to write job summary: ${e}`);
+        }
     }
 }
