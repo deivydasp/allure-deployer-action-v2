@@ -12,6 +12,15 @@ runs:
   post: "dist/cleanup/index.js"
 
 inputs:
+  mode:
+    description: "Action mode. 'deploy' generates and deploys a report. 'summary' reads deployed reports from gh-pages and writes a combined job summary table."
+    default: 'deploy'
+  summary:
+    description: "Write a GitHub Actions job summary after deployment. Set to 'false' to skip when using a separate summary job."
+    default: 'true'
+  prefixes:
+    description: "Comma-separated list of prefixes to include in summary mode. If omitted, all prefix directories on gh-pages are scanned."
+    required: false
   prefix:
     description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
     required: false
@@ -23,8 +32,8 @@ inputs:
     description: "Title of your report"
     required: false
   allure_results_path:
-    description: "A path/to/results or comma separate paths (path/to/results1,path/to/results2) of Allure results."
-    required: true
+    description: "A path/to/results or comma separate paths (path/to/results1,path/to/results2) of Allure results. Required in deploy mode."
+    required: false
   show_history:
     description: "Show history in the test report (true/false)"
     default: "true"

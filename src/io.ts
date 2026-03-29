@@ -17,10 +17,13 @@ function getInputOrUndefined<T extends input>(name: T): Inputs[T] | undefined {
 }
 
 const inputs: Inputs & DefaultConfig = {
+    mode: (getInput('mode') || 'deploy') as 'deploy' | 'summary',
+    summary: getBooleanInput('summary'),
+    prefixes: getInputOrUndefined('prefixes'),
     language: getInputOrUndefined('language'),
     report_name: getInputOrUndefined('report_name'),
     custom_report_dir: getInputOrUndefined('custom_report_dir'),
-    allure_results_path: getTypedInput('allure_results_path', true),
+    allure_results_path: getInputOrUndefined('allure_results_path'),
     show_history: getBooleanInput('show_history'),
     github_token: getTypedInput('github_token', true),
     github_pages_branch: getInputOrUndefined('github_pages_branch'),

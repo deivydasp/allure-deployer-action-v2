@@ -26,49 +26,32 @@ import {
     NotifyHandler,
     validateResultsPaths,
 } from './shared/index.js';
+import { buildSummaryTable } from './utilities/summary-table.js';
 import { copyDirectory } from './utilities/util.js';
 
 export async function main() {
+    if (inputs.mode === 'summary') {
+        await runSummaryMode();
+    } else {
+        await runDeployMode();
+    }
+}
+
+async function runDeployMode() {
     try {
-        const token = inputs.github_token;
-        if (!token) {
-            throw new Error("Github Pages require a valid 'github_token'");
+        if (!inputs.allure_results_path) {
+            throw new Error("'allure_results_path' is required in deploy mode");
         }
 
-        const repoParts = inputs.github_pages_repo!.split('/');
-        if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
-            throw new Error(`Invalid github_pages_repo format. Expected 'owner/repo', got '${inputs.github_pages_repo}'`);
-        }
-        const [owner, repo] = repoParts;
-        const { data } = await github
-            .getOctokit(token)
-            .rest.repos.getPages({
-                owner,
-                repo,
-            })
-            .catch((e: any) => {
-                if (e instanceof RequestError) {
-                    throw new Error(e.message);
-                }
-                throw e;
-            });
-
-        if (data.build_type !== 'legacy' || data.source?.branch !== inputs.github_pages_branch) {
-            startGroup('Configuration Error');
-            error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
-            error(`${github.context.serverUrl}/${inputs.github_pages_repo}/settings/pages`);
-            endGroup();
-            throw new Error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
-        }
-        const pagesSourcePath = data.source!.path.startsWith('/') ? data.source!.path.slice(1) : data.source!.path;
+        const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
 
         // reportDir with prefix == workspace/page-source-path/prefix/run-id
         // reportDir without a prefix == workspace/page-source-path/run-id
         const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
         const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
-        const pageUrl = normalizeUrl(`${data.html_url!}/${reportSubDir}`);
+        const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
         const host = getGitHubHost({
-            token,
+            token: inputs.github_token,
             owner,
             repo,
             pageUrl,
@@ -104,6 +87,73 @@ export async function main() {
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
     }
+}
+
+async function runSummaryMode() {
+    try {
+        const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
+
+        // Clone gh-pages (read-only)
+        const host = getGitHubHost({
+            token: inputs.github_token,
+            owner,
+            repo,
+            pageUrl: pagesUrl,
+            reportDir: inputs.WORKSPACE,
+            pagesSourcePath,
+            workspace: inputs.WORKSPACE,
+        });
+        await host.init();
+
+        // Scan prefixes and read summary.json from each
+        const rootDir = path.join(inputs.WORKSPACE, pagesSourcePath);
+        const rows = await scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath);
+
+        if (rows.length === 0) {
+            warning('No report summaries found on gh-pages. Skipping summary.');
+            return;
+        }
+
+        const table = buildSummaryTable(rows);
+        const githubService = new GitHubService();
+        await githubService.updateSummary(table);
+        info(`Summary table written with ${rows.length} report(s).`);
+    } catch (e) {
+        setFailed(`Summary failed: ${e instanceof Error ? e.message : e}`);
+    }
+}
+
+async function validateGitHubPages() {
+    const token = inputs.github_token;
+    if (!token) {
+        throw new Error("Github Pages require a valid 'github_token'");
+    }
+
+    const repoParts = inputs.github_pages_repo!.split('/');
+    if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+        throw new Error(`Invalid github_pages_repo format. Expected 'owner/repo', got '${inputs.github_pages_repo}'`);
+    }
+    const [owner, repo] = repoParts;
+    const { data } = await github
+        .getOctokit(token)
+        .rest.repos.getPages({ owner, repo })
+        .catch((e: any) => {
+            if (e instanceof RequestError) {
+                throw new Error(e.message);
+            }
+            throw e;
+        });
+
+    if (data.build_type !== 'legacy' || data.source?.branch !== inputs.github_pages_branch) {
+        startGroup('Configuration Error');
+        error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
+        error(`${github.context.serverUrl}/${inputs.github_pages_repo}/settings/pages`);
+        endGroup();
+        throw new Error(`GitHub Pages must be configured to deploy from '${inputs.github_pages_branch}' branch.`);
+    }
+
+    const pagesSourcePath = data.source!.path.startsWith('/') ? data.source!.path.slice(1) : data.source!.path;
+    return { owner, repo, pagesSourcePath, pagesUrl: data.html_url! };
 }
 
 function getGitHubHost({
@@ -253,6 +303,74 @@ async function sendNotifications(data: NotificationData) {
     const prNumber = github.context.payload.pull_request?.number;
     const prComment = inputs.pr_comment;
     const githubNotifierClient = new GitHubService();
-    notifiers.push(new GitHubNotifier({ client: githubNotifierClient, token, prNumber, prComment }));
+    notifiers.push(
+        new GitHubNotifier({ client: githubNotifierClient, token, prNumber, prComment, writeSummary: inputs.summary }),
+    );
     await new NotifyHandler(notifiers).sendNotifications(data);
+}
+
+async function scanPrefixSummaries(
+    rootDir: string,
+    pagesUrl: string,
+    pagesSourcePath: string,
+): Promise<import('./utilities/summary-table.js').SummaryRow[]> {
+    const { promises: fsp, existsSync } = await import('fs');
+    const rows: import('./utilities/summary-table.js').SummaryRow[] = [];
+
+    let entries: string[];
+    try {
+        entries = await fsp.readdir(rootDir);
+    } catch {
+        return rows;
+    }
+
+    // Filter to requested prefixes if specified
+    const requestedPrefixes = inputs.prefixes
+        ? inputs.prefixes.split(',').map((p) => p.trim()).filter(Boolean)
+        : undefined;
+
+    for (const entryName of entries) {
+        if (requestedPrefixes && !requestedPrefixes.includes(entryName)) continue;
+
+        const prefixDir = path.join(rootDir, entryName);
+        const stat = await fsp.stat(prefixDir).catch(() => null);
+        if (!stat?.isDirectory()) continue;
+
+        // Find latest numeric run dir
+        const runs = await fsp.readdir(prefixDir).catch(() => [] as string[]);
+        const runDirs = runs
+            .filter((r) => /^\d+$/.test(r))
+            .sort((a, b) => Number(b) - Number(a));
+
+        if (runDirs.length === 0) continue;
+
+        const latestDir = path.join(prefixDir, runDirs[0]);
+        for (const candidate of ['summary.json', 'awesome/summary.json']) {
+            const summaryPath = path.join(latestDir, candidate);
+            if (!existsSync(summaryPath)) continue;
+            try {
+                const summary = JSON.parse(await fsp.readFile(summaryPath, 'utf8'));
+                const stats = summary.stats ?? summary.statistic;
+                if (!stats) continue;
+
+                const reportSubDir = path.join(pagesSourcePath, entryName, runDirs[0]);
+                rows.push({
+                    reportName: summary.name ?? entryName,
+                    reportUrl: normalizeUrl(`${pagesUrl}/${reportSubDir}`),
+                    stats: {
+                        passed: stats.passed ?? 0,
+                        broken: stats.broken ?? 0,
+                        failed: stats.failed ?? 0,
+                        skipped: stats.skipped ?? 0,
+                        unknown: stats.unknown ?? 0,
+                    },
+                    duration: summary.duration,
+                });
+                break;
+            } catch (e) {
+                warning(`Failed to read summary for prefix '${entryName}': ${e}`);
+            }
+        }
+    }
+    return rows;
 }

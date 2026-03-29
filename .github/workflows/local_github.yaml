@@ -9,6 +9,7 @@ on:
           - gh
           - gh-no-backup
           - gh-multi
+          - gh-summary
         default: gh
       runner:
         description: Runner to use
@@ -77,6 +78,37 @@ jobs:
           show_history: ${{ github.event.inputs.show-history }}
           report_name: ${{ github.event.inputs.report-name }}
 
+
+  gh-summary:
+    if: ${{ github.event.inputs.job == 'gh-summary' }}
+    runs-on: ${{ github.event.inputs.runner }}
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy Report 1 (no summary)
+        uses: ./
+        with:
+          github_pages_branch: ${{ github.event.inputs.branch }}
+          prefix: 'project-a'
+          allure_results_path: 'allure-results'
+          report_name: 'Project A'
+          summary: 'false'
+      - name: Deploy Report 2 (no summary)
+        uses: ./
+        with:
+          github_pages_branch: ${{ github.event.inputs.branch }}
+          prefix: 'project-b'
+          allure_results_path: 'allure-results'
+          report_name: 'Project B'
+          summary: 'false'
+      - name: Combined Summary
+        uses: ./
+        with:
+          mode: summary
+          github_pages_branch: ${{ github.event.inputs.branch }}
+          prefixes: 'project-a,project-b'
 
   gh-no-backup:
     if: ${{ github.event.inputs.job == 'gh-no-backup' }}
