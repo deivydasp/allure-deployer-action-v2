@@ -18,7 +18,7 @@ function getInputOrUndefined<T extends input>(name: T): Inputs[T] | undefined {
 
 const inputs: Inputs & DefaultConfig = {
     mode: (getInput('mode') || 'deploy') as 'deploy' | 'summary',
-    summary: getBooleanInput('summary'),
+    summary: getInput('summary') !== 'false',
     prefixes: getInputOrUndefined('prefixes'),
     language: getInputOrUndefined('language'),
     report_name: getInputOrUndefined('report_name'),
