@@ -154,7 +154,7 @@ The summary job produces one table with all test results, showing "Not deployed"
 | Name                  | Description                                                                                    | Default             | Required |
 |-----------------------|------------------------------------------------------------------------------------------------|---------------------|----------|
 | `mode`                | Action mode: `deploy` (generate and deploy report) or `summary` (read gh-pages and write combined summary). | `deploy` | No |
-| `allure_results_path` | Path(s) to Allure results. Separate multiple paths with commas. Required in deploy mode.       | —                   | No       |
+| `allure_results_path` | Path(s) to Allure results. Separate multiple paths with commas. Required in deploy mode. Fails early if no valid paths are found. | —                   | No       |
 | `github_token`        | GitHub token or PAT for GitHub Pages deployment and `pr_comment`.                              | `github.token`      | No       |
 | `github_pages_branch` | Branch used for GitHub Pages deployments.                                                      | `gh-pages`          | No       |
 | `github_pages_repo`   | GitHub repository to deploy GitHub Pages to. Format: `owner/repo`.                             | `github.repository` | No       |
