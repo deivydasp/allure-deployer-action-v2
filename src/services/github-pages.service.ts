@@ -60,8 +60,10 @@ export class GithubPagesService implements GithubPagesInterface {
     private async prepareAndCommit(): Promise<void> {
         // Running sequentially to avoid git lock issues
         await this.deleteOldReports();
-        await this.createRedirectPage(normalizeUrl(`${this.pageUrl}`));
-        await this.createRootSummaryPage();
+        if (inputs.prefix) {
+            await this.createRedirectPage(normalizeUrl(`${this.pageUrl}`));
+            await this.createRootSummaryPage();
+        }
 
         if (!fs.existsSync(path.join(this.reportDir, 'index.html'))) {
             throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);

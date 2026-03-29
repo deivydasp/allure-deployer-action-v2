@@ -162,7 +162,7 @@ The summary job produces one table with all test results, showing "Not deployed"
 | `report_name`         | Custom name/title for the report.                                                              | —                   | No       |
 | `language`            | Allure report language.                                                                        | —                   | No       |
 | `custom_report_dir`   | Directory to copy the generated report into, for use in subsequent workflow steps.              | —                   | No       |
-| `prefix`              | Prefix to uniquely identify test report artifacts when managing multiple projects.              | —                   | No       |
+| `prefix`              | Prefix to uniquely identify test report artifacts. Required for summary page, redirect page, rerun tracking, and summary mode. | —  | No       |
 | `keep`                | Number of test reports to keep alive. Also limits history entries.                              | `10`                | No       |
 | `pr_comment`          | Post report info as a PR comment. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
 | `summary`             | Write a GitHub Actions job summary after deployment. Set to `false` when using a separate summary job. | `true` | No |
