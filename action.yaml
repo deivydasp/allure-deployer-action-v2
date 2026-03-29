@@ -23,7 +23,7 @@ inputs:
     required: false
   prefix:
     description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
-    required: false
+    required: true
   gh_artifact_prefix:
     description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
     required: false

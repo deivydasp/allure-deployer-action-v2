@@ -47,6 +47,9 @@ async function runDeployMode() {
         if (!inputs.allure_results_path) {
             throw new Error("'allure_results_path' is required in deploy mode");
         }
+        if (!inputs.prefix) {
+            throw new Error("'prefix' is required. It uniquely identifies your report on GitHub Pages.");
+        }
 
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
 
