@@ -286,24 +286,7 @@ async function detectReruns(
             .filter((r) => /^\d+$/.test(r))
             .sort((a, b) => Number(b) - Number(a));
 
-        const currentRunId = github.context.runId;
-        const deployMetas: { dir: string; meta: DeployMeta }[] = [];
-        for (const dir of runDirs) {
-            const metaPath = path.join(prefixDir, dir, 'deploy.json');
-            try {
-                if (existsSync(metaPath)) {
-                    const raw = JSON.parse(await readFile(metaPath, 'utf8'));
-                    if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
-                    if (raw.runId === currentRunId) {
-                        deployMetas.push({ dir, meta: raw as DeployMeta });
-                        if (raw.runAttempt === 1) break;
-                    }
-                }
-            } catch {
-                // skip
-            }
-        }
-
+        const deployMetas = await findDeployMetasForRun(prefixDir, runDirs, github.context.runId);
         if (deployMetas.length <= 1) return undefined;
 
         deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
@@ -453,25 +436,7 @@ async function scanSinglePrefix(
 
     if (runDirs.length === 0) return undefined;
 
-    // Read deploy.json from run dirs to find runs matching current runId.
-    // Stop early once we find attempt 1 (dirs sorted newest-first).
-    const currentRunId = github.context.runId;
-    const deployMetas: { dir: string; meta: DeployMeta }[] = [];
-    for (const dir of runDirs) {
-        const metaPath = path.join(prefixDir, dir, 'deploy.json');
-        try {
-            if (existsSync(metaPath)) {
-                const raw = JSON.parse(await readFile(metaPath, 'utf8'));
-                if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
-                if (raw.runId === currentRunId) {
-                    deployMetas.push({ dir, meta: raw as DeployMeta });
-                    if (raw.runAttempt === 1) break;
-                }
-            }
-        } catch {
-            // skip unreadable meta
-        }
-    }
+    const deployMetas = await findDeployMetasForRun(prefixDir, runDirs, github.context.runId);
 
     deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
 
@@ -518,6 +483,35 @@ async function scanSinglePrefix(
         duration: primaryMeta?.wallClockDuration,
         reruns: reruns.length > 0 ? reruns : undefined,
     };
+}
+
+/**
+ * Scans run directories for deploy.json files matching a specific runId.
+ * Stops early once attempt 1 is found (dirs are sorted newest-first).
+ * Returns results sorted by attempt ascending.
+ */
+async function findDeployMetasForRun(
+    prefixDir: string,
+    runDirs: string[],
+    runId: number,
+): Promise<{ dir: string; meta: DeployMeta }[]> {
+    const deployMetas: { dir: string; meta: DeployMeta }[] = [];
+    for (const dir of runDirs) {
+        const metaPath = path.join(prefixDir, dir, 'deploy.json');
+        try {
+            if (existsSync(metaPath)) {
+                const raw = JSON.parse(await readFile(metaPath, 'utf8'));
+                if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
+                if (raw.runId === runId) {
+                    deployMetas.push({ dir, meta: raw as DeployMeta });
+                    if (raw.runAttempt === 1) break;
+                }
+            }
+        } catch {
+            // skip unreadable meta
+        }
+    }
+    return deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
 }
 
 /** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */
