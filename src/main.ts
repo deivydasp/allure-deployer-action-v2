@@ -354,15 +354,19 @@ async function scanPrefixSummaries(
         // Case-insensitive match to find actual directory name on disk
         const dirName = dirEntries.find((e) => e.toLowerCase() === prefixName.toLowerCase());
 
-        const row = dirName
-            ? await scanSinglePrefix(path.join(rootDir, dirName), dirName, pagesUrl, pagesSourcePath)
+        const prefixDir = dirName ? path.join(rootDir, dirName) : undefined;
+        const row = prefixDir
+            ? await scanSinglePrefix(prefixDir, dirName!, pagesUrl, pagesSourcePath)
             : undefined;
 
         if (row) {
             rows.push(row);
         } else if (requestedPrefixes) {
-            // Pipeline mode: prefix expected but not deployed — show indicator
-            rows.push({ reportName: prefixName, notDeployed: true });
+            // Pipeline mode: prefix expected but not deployed — try to get name from previous run
+            const reportName = prefixDir
+                ? await readPreviousReportName(prefixDir) ?? prefixName
+                : prefixName;
+            rows.push({ reportName, notDeployed: true });
         }
     }
     return rows;
@@ -455,6 +459,28 @@ async function scanSinglePrefix(
         } catch (e) {
             warning(`Failed to read summary for prefix '${dirName}': ${e}`);
         }
+    }
+    return undefined;
+}
+
+async function readPreviousReportName(prefixDir: string): Promise<string | undefined> {
+    try {
+        const runs = await readdir(prefixDir);
+        const latestRunDir = runs
+            .filter((r) => /^\d+$/.test(r))
+            .sort((a, b) => Number(b) - Number(a))[0];
+        if (!latestRunDir) return undefined;
+
+        const latestDir = path.join(prefixDir, latestRunDir);
+        for (const candidate of ['summary.json', 'awesome/summary.json']) {
+            const summaryPath = path.join(latestDir, candidate);
+            if (existsSync(summaryPath)) {
+                const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
+                if (summary.name) return summary.name;
+            }
+        }
+    } catch {
+        // fall through
     }
     return undefined;
 }
