@@ -1,5 +1,6 @@
 import { ReportStatistic } from '../shared/index.js';
 
+// Allure's public Cloudflare worker for pie/dot chart images (same as allure-action uses)
 const CHART_URL = 'https://allurecharts.qameta.workers.dev';
 
 export interface SummaryRow {

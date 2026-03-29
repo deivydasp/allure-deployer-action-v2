@@ -1,7 +1,8 @@
 import { endGroup, error, info, setFailed, startGroup, warning } from '@actions/core';
 import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
-import { mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import { mkdir, readdir, readFile, stat } from 'fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
 import { GithubStorage, GithubStorageConfig } from './features/github-storage.js';
@@ -26,10 +27,14 @@ import {
     NotifyHandler,
     validateResultsPaths,
 } from './shared/index.js';
-import { buildSummaryTable } from './utilities/summary-table.js';
+import { buildSummaryTable, SummaryRow } from './utilities/summary-table.js';
 import { copyDirectory } from './utilities/util.js';
 
 export async function main() {
+    if (inputs.mode !== 'deploy' && inputs.mode !== 'summary') {
+        setFailed(`Invalid mode '${inputs.mode}'. Expected 'deploy' or 'summary'.`);
+        return;
+    }
     if (inputs.mode === 'summary') {
         await runSummaryMode();
     } else {
@@ -313,31 +318,30 @@ async function scanPrefixSummaries(
     rootDir: string,
     pagesUrl: string,
     pagesSourcePath: string,
-): Promise<import('./utilities/summary-table.js').SummaryRow[]> {
-    const { promises: fsp, existsSync } = await import('fs');
-    const rows: import('./utilities/summary-table.js').SummaryRow[] = [];
+): Promise<SummaryRow[]> {
+    const rows: SummaryRow[] = [];
 
     let entries: string[];
     try {
-        entries = await fsp.readdir(rootDir);
+        entries = await readdir(rootDir);
     } catch {
         return rows;
     }
 
-    // Filter to requested prefixes if specified
+    // Filter to requested prefixes if specified (case-insensitive)
     const requestedPrefixes = inputs.prefixes
-        ? inputs.prefixes.split(',').map((p) => p.trim()).filter(Boolean)
+        ? inputs.prefixes.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean)
         : undefined;
 
     for (const entryName of entries) {
-        if (requestedPrefixes && !requestedPrefixes.includes(entryName)) continue;
+        if (requestedPrefixes && !requestedPrefixes.includes(entryName.toLowerCase())) continue;
 
         const prefixDir = path.join(rootDir, entryName);
-        const stat = await fsp.stat(prefixDir).catch(() => null);
-        if (!stat?.isDirectory()) continue;
+        const entryStat = await stat(prefixDir).catch(() => null);
+        if (!entryStat?.isDirectory()) continue;
 
         // Find latest numeric run dir
-        const runs = await fsp.readdir(prefixDir).catch(() => [] as string[]);
+        const runs = await readdir(prefixDir).catch(() => [] as string[]);
         const runDirs = runs
             .filter((r) => /^\d+$/.test(r))
             .sort((a, b) => Number(b) - Number(a));
@@ -349,22 +353,23 @@ async function scanPrefixSummaries(
             const summaryPath = path.join(latestDir, candidate);
             if (!existsSync(summaryPath)) continue;
             try {
-                const summary = JSON.parse(await fsp.readFile(summaryPath, 'utf8'));
-                const stats = summary.stats ?? summary.statistic;
-                if (!stats) continue;
+                const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
+                const summaryStats = summary.stats ?? summary.statistic;
+                if (!summaryStats) continue;
 
                 const reportSubDir = path.join(pagesSourcePath, entryName, runDirs[0]);
                 rows.push({
                     reportName: summary.name ?? entryName,
                     reportUrl: normalizeUrl(`${pagesUrl}/${reportSubDir}`),
                     stats: {
-                        passed: stats.passed ?? 0,
-                        broken: stats.broken ?? 0,
-                        failed: stats.failed ?? 0,
-                        skipped: stats.skipped ?? 0,
-                        unknown: stats.unknown ?? 0,
+                        passed: summaryStats.passed ?? 0,
+                        broken: summaryStats.broken ?? 0,
+                        failed: summaryStats.failed ?? 0,
+                        skipped: summaryStats.skipped ?? 0,
+                        unknown: summaryStats.unknown ?? 0,
                     },
-                    duration: summary.duration,
+                    // summary.duration is cumulative test time, not wall-clock;
+                    // omit to avoid confusion (wall-clock is only available at deploy time)
                 });
                 break;
             } catch (e) {
