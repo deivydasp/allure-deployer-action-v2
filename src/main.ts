@@ -341,17 +341,33 @@ async function scanPrefixSummaries(
         return rows;
     }
 
-    // Filter to requested prefixes if specified (case-insensitive)
+    // Determine which prefixes to scan
     const requestedPrefixes = inputs.prefixes
-        ? inputs.prefixes.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean)
+        ? inputs.prefixes.split(',').map((p) => p.trim()).filter(Boolean)
         : undefined;
+    const pipelineMode = !!requestedPrefixes;
 
-    for (const entryName of entries) {
-        if (requestedPrefixes && !requestedPrefixes.includes(entryName.toLowerCase())) continue;
+    // In pipeline mode, iterate requested prefixes (some may not exist on gh-pages)
+    // In standalone mode, iterate existing directories
+    const prefixNames = requestedPrefixes ?? entries;
+
+    for (const entryName of prefixNames) {
+        if (!requestedPrefixes && !entries.includes(entryName)) continue;
 
         const prefixDir = path.join(rootDir, entryName);
         const entryStat = await stat(prefixDir).catch(() => null);
-        if (!entryStat?.isDirectory()) continue;
+
+        if (!entryStat?.isDirectory()) {
+            // Prefix directory doesn't exist on gh-pages
+            if (pipelineMode) {
+                rows.push({
+                    reportName: entryName,
+                    stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
+                    notDeployed: true,
+                });
+            }
+            continue;
+        }
 
         // Find all numeric run dirs (newest first)
         const runs = await readdir(prefixDir).catch(() => [] as string[]);
@@ -359,7 +375,16 @@ async function scanPrefixSummaries(
             .filter((r) => /^\d+$/.test(r))
             .sort((a, b) => Number(b) - Number(a));
 
-        if (runDirs.length === 0) continue;
+        if (runDirs.length === 0) {
+            if (pipelineMode) {
+                rows.push({
+                    reportName: entryName,
+                    stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
+                    notDeployed: true,
+                });
+            }
+            continue;
+        }
 
         // Read deploy.json from run dirs to find runs matching current runId.
         // Stop early once we find attempt 1 (dirs are sorted newest-first,
@@ -384,6 +409,16 @@ async function scanPrefixSummaries(
 
         // Sort by attempt (ascending): attempt 1 is the "Report", rest are "Rerun #N"
         deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
+
+        // In pipeline mode, if no deploy.json matches current runId, the job was likely cancelled/skipped
+        if (pipelineMode && deployMetas.length === 0) {
+            rows.push({
+                reportName: entryName,
+                stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
+                notDeployed: true,
+            });
+            continue;
+        }
 
         // Use the latest run dir for stats (either latest from current runId, or just the latest overall)
         const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
