@@ -354,19 +354,21 @@ async function scanPrefixSummaries(
         // Case-insensitive match to find actual directory name on disk
         const dirName = dirEntries.find((e) => e.toLowerCase() === prefixName.toLowerCase());
 
-        const prefixDir = dirName ? path.join(rootDir, dirName) : undefined;
-        const row = prefixDir
-            ? await scanSinglePrefix(prefixDir, dirName!, pagesUrl, pagesSourcePath)
-            : undefined;
-
-        if (row) {
-            rows.push(row);
+        if (dirName) {
+            const prefixDir = path.join(rootDir, dirName);
+            const row = await scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath);
+            if (row) {
+                rows.push(row);
+                continue;
+            }
+            // Pipeline mode: prefix exists but not deployed in this run
+            if (requestedPrefixes) {
+                const summary = await findLatestSummary(prefixDir);
+                rows.push({ reportName: summary?.name ?? prefixName, notDeployed: true });
+            }
         } else if (requestedPrefixes) {
-            // Pipeline mode: prefix expected but not deployed — try to get name from previous run
-            const reportName = prefixDir
-                ? await readPreviousReportName(prefixDir) ?? prefixName
-                : prefixName;
-            rows.push({ reportName, notDeployed: true });
+            // Pipeline mode: prefix never deployed
+            rows.push({ reportName: prefixName, notDeployed: true });
         }
     }
     return rows;
@@ -417,70 +419,64 @@ async function scanSinglePrefix(
     const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
     const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
 
-    const latestDir = path.join(prefixDir, primaryDir);
+    const summary = await readSummaryFromDir(path.join(prefixDir, primaryDir));
+    if (!summary) return undefined;
+
+    const summaryStats = summary.stats ?? summary.statistic;
+    if (!summaryStats) return undefined;
+
+    // Build rerun links
+    const reruns: RerunInfo[] = [];
+    if (deployMetas.length > 1) {
+        for (let i = 1; i < deployMetas.length; i++) {
+            const rerunDir = path.join(pagesSourcePath, dirName, deployMetas[i].dir);
+            reruns.push({
+                attempt: deployMetas[i].meta.runAttempt,
+                url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
+            });
+        }
+    }
+
+    // Use first attempt as Report link when reruns exist, otherwise latest
+    const reportDir = deployMetas.length > 1
+        ? path.join(pagesSourcePath, dirName, deployMetas[0].dir)
+        : path.join(pagesSourcePath, dirName, primaryDir);
+
+    return {
+        reportName: summary.name ?? dirName,
+        reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
+        stats: {
+            passed: summaryStats.passed ?? 0,
+            broken: summaryStats.broken ?? 0,
+            failed: summaryStats.failed ?? 0,
+            skipped: summaryStats.skipped ?? 0,
+            unknown: summaryStats.unknown ?? 0,
+        },
+        duration: primaryMeta?.wallClockDuration,
+        reruns: reruns.length > 0 ? reruns : undefined,
+    };
+}
+
+/** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */
+async function readSummaryFromDir(reportDir: string): Promise<any | undefined> {
     for (const candidate of ['summary.json', 'awesome/summary.json']) {
-        const summaryPath = path.join(latestDir, candidate);
+        const summaryPath = path.join(reportDir, candidate);
         if (!existsSync(summaryPath)) continue;
         try {
-            const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
-            const summaryStats = summary.stats ?? summary.statistic;
-            if (!summaryStats) continue;
-
-            // Build rerun links
-            const reruns: RerunInfo[] = [];
-            if (deployMetas.length > 1) {
-                for (let i = 1; i < deployMetas.length; i++) {
-                    const rerunDir = path.join(pagesSourcePath, dirName, deployMetas[i].dir);
-                    reruns.push({
-                        attempt: deployMetas[i].meta.runAttempt,
-                        url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
-                    });
-                }
-            }
-
-            // Use first attempt as Report link when reruns exist, otherwise latest
-            const reportDir = deployMetas.length > 1
-                ? path.join(pagesSourcePath, dirName, deployMetas[0].dir)
-                : path.join(pagesSourcePath, dirName, primaryDir);
-
-            return {
-                reportName: summary.name ?? dirName,
-                reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
-                stats: {
-                    passed: summaryStats.passed ?? 0,
-                    broken: summaryStats.broken ?? 0,
-                    failed: summaryStats.failed ?? 0,
-                    skipped: summaryStats.skipped ?? 0,
-                    unknown: summaryStats.unknown ?? 0,
-                },
-                duration: primaryMeta?.wallClockDuration,
-                reruns: reruns.length > 0 ? reruns : undefined,
-            };
+            return JSON.parse(await readFile(summaryPath, 'utf8'));
         } catch (e) {
-            warning(`Failed to read summary for prefix '${dirName}': ${e}`);
+            warning(`Failed to read ${summaryPath}: ${e}`);
         }
     }
     return undefined;
 }
 
-async function readPreviousReportName(prefixDir: string): Promise<string | undefined> {
-    try {
-        const runs = await readdir(prefixDir);
-        const latestRunDir = runs
-            .filter((r) => /^\d+$/.test(r))
-            .sort((a, b) => Number(b) - Number(a))[0];
-        if (!latestRunDir) return undefined;
-
-        const latestDir = path.join(prefixDir, latestRunDir);
-        for (const candidate of ['summary.json', 'awesome/summary.json']) {
-            const summaryPath = path.join(latestDir, candidate);
-            if (existsSync(summaryPath)) {
-                const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
-                if (summary.name) return summary.name;
-            }
-        }
-    } catch {
-        // fall through
-    }
-    return undefined;
+/** Finds the latest run directory under a prefix and reads its summary.json. */
+async function findLatestSummary(prefixDir: string): Promise<any | undefined> {
+    const runs = await readdir(prefixDir).catch(() => [] as string[]);
+    const latestRunDir = runs
+        .filter((r) => /^\d+$/.test(r))
+        .sort((a, b) => Number(b) - Number(a))[0];
+    if (!latestRunDir) return undefined;
+    return readSummaryFromDir(path.join(prefixDir, latestRunDir));
 }
