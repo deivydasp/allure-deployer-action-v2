@@ -27,7 +27,7 @@ import {
     NotifyHandler,
     validateResultsPaths,
 } from './shared/index.js';
-import { buildSummaryTable, SummaryRow } from './utilities/summary-table.js';
+import { buildSummaryTable, DeployMeta, RerunInfo, SummaryRow } from './utilities/summary-table.js';
 import { copyDirectory } from './utilities/util.js';
 
 export async function main() {
@@ -253,13 +253,6 @@ async function generateAllureReport({ allure, reportUrl }: { allure: Allure; rep
     info('Report generated successfully!');
 }
 
-export interface DeployMeta {
-    runId: number;
-    runAttempt: number;
-    wallClockDuration?: number;
-    timestamp: number;
-}
-
 async function writeDeployMeta(reportDir: string, wallClockDuration?: number): Promise<void> {
     const meta: DeployMeta = {
         runId: github.context.runId,
@@ -368,15 +361,20 @@ async function scanPrefixSummaries(
 
         if (runDirs.length === 0) continue;
 
-        // Read deploy.json from all dirs to find runs matching current runId
+        // Read deploy.json from run dirs to find runs matching current runId.
+        // Stop early once we find attempt 1 (dirs are sorted newest-first,
+        // so once we hit the original attempt there can't be older ones for this run).
         const deployMetas: { dir: string; meta: DeployMeta }[] = [];
         for (const dir of runDirs) {
             const metaPath = path.join(prefixDir, dir, 'deploy.json');
             try {
                 if (existsSync(metaPath)) {
-                    const meta: DeployMeta = JSON.parse(await readFile(metaPath, 'utf8'));
+                    const raw = JSON.parse(await readFile(metaPath, 'utf8'));
+                    if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
+                    const meta: DeployMeta = raw;
                     if (meta.runId === currentRunId) {
                         deployMetas.push({ dir, meta });
+                        if (meta.runAttempt === 1) break; // found the original, no need to go further
                     }
                 }
             } catch {
@@ -403,7 +401,7 @@ async function scanPrefixSummaries(
                 const reportSubDir = path.join(pagesSourcePath, entryName, primaryDir);
 
                 // Build rerun links from earlier attempts
-                const reruns: import('./utilities/summary-table.js').RerunInfo[] = [];
+                const reruns: RerunInfo[] = [];
                 if (deployMetas.length > 1) {
                     // First attempt is the "Report" link; subsequent are reruns
                     for (let i = 1; i < deployMetas.length; i++) {

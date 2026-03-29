@@ -3,6 +3,13 @@ import { ReportStatistic } from '../shared/index.js';
 // Allure's public Cloudflare worker for pie/dot chart images (same as allure-action uses)
 const CHART_URL = 'https://allurecharts.qameta.workers.dev';
 
+export interface DeployMeta {
+    runId: number;
+    runAttempt: number;
+    wallClockDuration?: number;
+    timestamp: number;
+}
+
 export interface RerunInfo {
     attempt: number;
     url: string;
@@ -63,17 +70,19 @@ function buildRow(row: SummaryRow, maxReruns: number): string {
 }
 
 export function buildSummaryTable(rows: SummaryRow[]): string {
-    const maxReruns = Math.max(0, ...rows.map((r) => r.reruns?.length ?? 0));
+    // Find the highest rerun attempt across all rows (attempt 2 = Rerun #1, attempt 3 = Rerun #2, etc.)
+    const maxAttempt = Math.max(1, ...rows.flatMap((r) => r.reruns?.map((rr) => rr.attempt) ?? [1]));
+    const rerunCount = maxAttempt - 1; // attempt 1 is the original, reruns start at attempt 2
 
     let header = `| | Name | Duration | Stats | Total | Report`;
     let separator = `|-|-|-|-|-|-`;
-    for (let i = 1; i <= maxReruns; i++) {
+    for (let i = 1; i <= rerunCount; i++) {
         header += ` | Rerun #${i}`;
         separator += `|-`;
     }
     header += ` |`;
     separator += `|`;
 
-    const tableRows = rows.map((r) => buildRow(r, maxReruns)).join('\n');
+    const tableRows = rows.map((r) => buildRow(r, rerunCount)).join('\n');
     return `${header}\n${separator}\n${tableRows}`;
 }
