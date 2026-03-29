@@ -276,6 +276,7 @@ async function detectReruns(
     pagesUrl: string,
     pagesSourcePath: string,
 ): Promise<{ originalUrl: string; reruns: RerunInfo[] } | undefined> {
+    // Rerun tracking requires prefix (for URL construction) and attempt > 1
     if (github.context.runAttempt <= 1 || !inputs.prefix) return undefined;
 
     try {
@@ -320,7 +321,8 @@ async function detectReruns(
         }
 
         return { originalUrl, reruns };
-    } catch {
+    } catch (e) {
+        warning(`Failed to detect reruns: ${e}`);
         return undefined;
     }
 }
