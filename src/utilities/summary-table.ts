@@ -74,7 +74,8 @@ export function buildSummaryTable(rows: SummaryRow[]): string {
     const maxAttempt = Math.max(1, ...rows.flatMap((r) => r.reruns?.map((rr) => rr.attempt) ?? [1]));
     const rerunCount = maxAttempt - 1; // attempt 1 is the original, reruns start at attempt 2
 
-    let header = `| | Name | Duration | Stats | Total | Report`;
+    const reportLabel = rerunCount > 0 ? 'Original' : 'Report';
+    let header = `| | Name | Duration | Stats | Total | ${reportLabel}`;
     let separator = `|-|-|-|-|-|-`;
     for (let i = 1; i <= rerunCount; i++) {
         header += ` | Rerun #${i}`;
