@@ -6,4 +6,6 @@ export interface NotificationData {
     reportUrl?: string;
     reportName?: string;
     duration?: number;
+    originalReportUrl?: string;
+    reruns?: { attempt: number; url: string }[];
 }

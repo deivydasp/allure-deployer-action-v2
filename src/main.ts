@@ -84,12 +84,15 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const [reportStats] = await finalizeDeployment({ host, storage, reportDir });
+        const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
             reportUrl,
             environment: allure.readEnvironments(),
             reportName: inputs.report_name,
             duration: wallClockDuration,
+            originalReportUrl: rerunInfo?.originalUrl,
+            reruns: rerunInfo?.reruns,
         });
     } catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);
@@ -262,6 +265,64 @@ async function writeDeployMeta(reportDir: string, wallClockDuration?: number): P
         timestamp: Date.now(),
     };
     await writeFile(path.join(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
+}
+
+/**
+ * Detects previous attempts for the current runId by scanning deploy.json files
+ * in the prefix directory. Returns rerun info if this is attempt > 1.
+ */
+async function detectReruns(
+    reportDir: string,
+    pagesUrl: string,
+    pagesSourcePath: string,
+): Promise<{ originalUrl: string; reruns: RerunInfo[] } | undefined> {
+    if (github.context.runAttempt <= 1 || !inputs.prefix) return undefined;
+
+    try {
+        const prefixDir = path.dirname(reportDir);
+        const runs = await readdir(prefixDir);
+        const runDirs = runs
+            .filter((r) => /^\d+$/.test(r))
+            .sort((a, b) => Number(b) - Number(a));
+
+        const currentRunId = github.context.runId;
+        const deployMetas: { dir: string; meta: DeployMeta }[] = [];
+        for (const dir of runDirs) {
+            const metaPath = path.join(prefixDir, dir, 'deploy.json');
+            try {
+                if (existsSync(metaPath)) {
+                    const raw = JSON.parse(await readFile(metaPath, 'utf8'));
+                    if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
+                    if (raw.runId === currentRunId) {
+                        deployMetas.push({ dir, meta: raw as DeployMeta });
+                        if (raw.runAttempt === 1) break;
+                    }
+                }
+            } catch {
+                // skip
+            }
+        }
+
+        if (deployMetas.length <= 1) return undefined;
+
+        deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
+
+        const originalDir = path.join(pagesSourcePath, inputs.prefix, deployMetas[0].dir);
+        const originalUrl = normalizeUrl(`${pagesUrl}/${originalDir}`);
+
+        const reruns: RerunInfo[] = [];
+        for (let i = 1; i < deployMetas.length; i++) {
+            const rerunDir = path.join(pagesSourcePath, inputs.prefix, deployMetas[i].dir);
+            reruns.push({
+                attempt: deployMetas[i].meta.runAttempt,
+                url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
+            });
+        }
+
+        return { originalUrl, reruns };
+    } catch {
+        return undefined;
+    }
 }
 
 function createExecutor(reportUrl?: string): ExecutorInterface {

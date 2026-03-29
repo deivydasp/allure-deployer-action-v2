@@ -29,9 +29,10 @@ export class GitHubNotifier implements Notifier {
         const message = buildSummaryTable([
             {
                 reportName: data.reportName ?? 'Allure Report',
-                reportUrl: data.reportUrl,
+                reportUrl: data.originalReportUrl ?? data.reportUrl,
                 stats: data.resultStatus,
                 duration: data.duration,
+                reruns: data.reruns,
             },
         ]);
 
