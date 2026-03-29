@@ -332,146 +332,128 @@ async function scanPrefixSummaries(
     pagesSourcePath: string,
 ): Promise<SummaryRow[]> {
     const rows: SummaryRow[] = [];
-    const currentRunId = github.context.runId;
 
-    let entries: string[];
+    let dirEntries: string[];
     try {
-        entries = await readdir(rootDir);
+        dirEntries = await readdir(rootDir);
     } catch {
         return rows;
     }
 
-    // Determine which prefixes to scan
+    // Determine which prefixes to scan and whether to show "not deployed" indicators
     const requestedPrefixes = inputs.prefixes
         ? inputs.prefixes.split(',').map((p) => p.trim()).filter(Boolean)
         : undefined;
-    const pipelineMode = !!requestedPrefixes;
 
-    // In pipeline mode, iterate requested prefixes (some may not exist on gh-pages)
-    // In standalone mode, iterate existing directories
-    const prefixNames = requestedPrefixes ?? entries;
+    // In pipeline mode (prefixes specified), iterate requested prefixes — some may not exist on gh-pages.
+    // In standalone mode, iterate existing directories only.
+    const prefixNames = requestedPrefixes ?? dirEntries;
 
-    for (const entryName of prefixNames) {
-        if (!requestedPrefixes && !entries.includes(entryName)) continue;
+    for (const prefixName of prefixNames) {
+        // Case-insensitive match to find actual directory name on disk
+        const dirName = dirEntries.find((e) => e.toLowerCase() === prefixName.toLowerCase());
 
-        const prefixDir = path.join(rootDir, entryName);
-        const entryStat = await stat(prefixDir).catch(() => null);
+        const row = dirName
+            ? await scanSinglePrefix(path.join(rootDir, dirName), dirName, pagesUrl, pagesSourcePath)
+            : undefined;
 
-        if (!entryStat?.isDirectory()) {
-            // Prefix directory doesn't exist on gh-pages
-            if (pipelineMode) {
-                rows.push({
-                    reportName: entryName,
-                    stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
-                    notDeployed: true,
-                });
-            }
-            continue;
-        }
-
-        // Find all numeric run dirs (newest first)
-        const runs = await readdir(prefixDir).catch(() => [] as string[]);
-        const runDirs = runs
-            .filter((r) => /^\d+$/.test(r))
-            .sort((a, b) => Number(b) - Number(a));
-
-        if (runDirs.length === 0) {
-            if (pipelineMode) {
-                rows.push({
-                    reportName: entryName,
-                    stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
-                    notDeployed: true,
-                });
-            }
-            continue;
-        }
-
-        // Read deploy.json from run dirs to find runs matching current runId.
-        // Stop early once we find attempt 1 (dirs are sorted newest-first,
-        // so once we hit the original attempt there can't be older ones for this run).
-        const deployMetas: { dir: string; meta: DeployMeta }[] = [];
-        for (const dir of runDirs) {
-            const metaPath = path.join(prefixDir, dir, 'deploy.json');
-            try {
-                if (existsSync(metaPath)) {
-                    const raw = JSON.parse(await readFile(metaPath, 'utf8'));
-                    if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
-                    const meta: DeployMeta = raw;
-                    if (meta.runId === currentRunId) {
-                        deployMetas.push({ dir, meta });
-                        if (meta.runAttempt === 1) break; // found the original, no need to go further
-                    }
-                }
-            } catch {
-                // skip unreadable meta
-            }
-        }
-
-        // Sort by attempt (ascending): attempt 1 is the "Report", rest are "Rerun #N"
-        deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
-
-        // In pipeline mode, if no deploy.json matches current runId, the job was likely cancelled/skipped
-        if (pipelineMode && deployMetas.length === 0) {
-            rows.push({
-                reportName: entryName,
-                stats: { passed: 0, broken: 0, failed: 0, skipped: 0, unknown: 0 },
-                notDeployed: true,
-            });
-            continue;
-        }
-
-        // Use the latest run dir for stats (either latest from current runId, or just the latest overall)
-        const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
-        const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
-
-        const latestDir = path.join(prefixDir, primaryDir);
-        for (const candidate of ['summary.json', 'awesome/summary.json']) {
-            const summaryPath = path.join(latestDir, candidate);
-            if (!existsSync(summaryPath)) continue;
-            try {
-                const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
-                const summaryStats = summary.stats ?? summary.statistic;
-                if (!summaryStats) continue;
-
-                const reportSubDir = path.join(pagesSourcePath, entryName, primaryDir);
-
-                // Build rerun links from earlier attempts
-                const reruns: RerunInfo[] = [];
-                if (deployMetas.length > 1) {
-                    // First attempt is the "Report" link; subsequent are reruns
-                    for (let i = 1; i < deployMetas.length; i++) {
-                        const rerunDir = path.join(pagesSourcePath, entryName, deployMetas[i].dir);
-                        reruns.push({
-                            attempt: deployMetas[i].meta.runAttempt,
-                            url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
-                        });
-                    }
-                }
-
-                // Use first attempt as the Report link when reruns exist
-                const reportDir =
-                    deployMetas.length > 1
-                        ? path.join(pagesSourcePath, entryName, deployMetas[0].dir)
-                        : reportSubDir;
-
-                rows.push({
-                    reportName: summary.name ?? entryName,
-                    reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
-                    stats: {
-                        passed: summaryStats.passed ?? 0,
-                        broken: summaryStats.broken ?? 0,
-                        failed: summaryStats.failed ?? 0,
-                        skipped: summaryStats.skipped ?? 0,
-                        unknown: summaryStats.unknown ?? 0,
-                    },
-                    duration: primaryMeta?.wallClockDuration,
-                    reruns: reruns.length > 0 ? reruns : undefined,
-                });
-                break;
-            } catch (e) {
-                warning(`Failed to read summary for prefix '${entryName}': ${e}`);
-            }
+        if (row) {
+            rows.push(row);
+        } else if (requestedPrefixes) {
+            // Pipeline mode: prefix expected but not deployed — show indicator
+            rows.push({ reportName: prefixName, notDeployed: true });
         }
     }
     return rows;
+}
+
+async function scanSinglePrefix(
+    prefixDir: string,
+    dirName: string,
+    pagesUrl: string,
+    pagesSourcePath: string,
+): Promise<SummaryRow | undefined> {
+    const entryStat = await stat(prefixDir).catch(() => null);
+    if (!entryStat?.isDirectory()) return undefined;
+
+    const runs = await readdir(prefixDir).catch(() => [] as string[]);
+    const runDirs = runs
+        .filter((r) => /^\d+$/.test(r))
+        .sort((a, b) => Number(b) - Number(a));
+
+    if (runDirs.length === 0) return undefined;
+
+    // Read deploy.json from run dirs to find runs matching current runId.
+    // Stop early once we find attempt 1 (dirs sorted newest-first).
+    const currentRunId = github.context.runId;
+    const deployMetas: { dir: string; meta: DeployMeta }[] = [];
+    for (const dir of runDirs) {
+        const metaPath = path.join(prefixDir, dir, 'deploy.json');
+        try {
+            if (existsSync(metaPath)) {
+                const raw = JSON.parse(await readFile(metaPath, 'utf8'));
+                if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
+                if (raw.runId === currentRunId) {
+                    deployMetas.push({ dir, meta: raw as DeployMeta });
+                    if (raw.runAttempt === 1) break;
+                }
+            }
+        } catch {
+            // skip unreadable meta
+        }
+    }
+
+    deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
+
+    // If prefixes were specified (pipeline mode) and no deploy.json matches, report as not deployed
+    if (inputs.prefixes && deployMetas.length === 0) return undefined;
+
+    // Use latest attempt for stats, or latest run dir if no meta matches
+    const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
+    const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
+
+    const latestDir = path.join(prefixDir, primaryDir);
+    for (const candidate of ['summary.json', 'awesome/summary.json']) {
+        const summaryPath = path.join(latestDir, candidate);
+        if (!existsSync(summaryPath)) continue;
+        try {
+            const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
+            const summaryStats = summary.stats ?? summary.statistic;
+            if (!summaryStats) continue;
+
+            // Build rerun links
+            const reruns: RerunInfo[] = [];
+            if (deployMetas.length > 1) {
+                for (let i = 1; i < deployMetas.length; i++) {
+                    const rerunDir = path.join(pagesSourcePath, dirName, deployMetas[i].dir);
+                    reruns.push({
+                        attempt: deployMetas[i].meta.runAttempt,
+                        url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
+                    });
+                }
+            }
+
+            // Use first attempt as Report link when reruns exist, otherwise latest
+            const reportDir = deployMetas.length > 1
+                ? path.join(pagesSourcePath, dirName, deployMetas[0].dir)
+                : path.join(pagesSourcePath, dirName, primaryDir);
+
+            return {
+                reportName: summary.name ?? dirName,
+                reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
+                stats: {
+                    passed: summaryStats.passed ?? 0,
+                    broken: summaryStats.broken ?? 0,
+                    failed: summaryStats.failed ?? 0,
+                    skipped: summaryStats.skipped ?? 0,
+                    unknown: summaryStats.unknown ?? 0,
+                },
+                duration: primaryMeta?.wallClockDuration,
+                reruns: reruns.length > 0 ? reruns : undefined,
+            };
+        } catch (e) {
+            warning(`Failed to read summary for prefix '${dirName}': ${e}`);
+        }
+    }
+    return undefined;
 }

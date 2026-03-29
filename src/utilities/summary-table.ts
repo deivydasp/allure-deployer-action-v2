@@ -18,7 +18,7 @@ export interface RerunInfo {
 export interface SummaryRow {
     reportName: string;
     reportUrl?: string;
-    stats: ReportStatistic;
+    stats?: ReportStatistic;
     duration?: number;
     reruns?: RerunInfo[];
     notDeployed?: boolean;
@@ -34,8 +34,8 @@ function formatDuration(ms: number): string {
 }
 
 function buildRow(row: SummaryRow, maxReruns: number): string {
-    if (row.notDeployed) {
-        let result = `| — | **${row.reportName}** | — | *Not deployed in this run* | — | —`;
+    if (row.notDeployed || !row.stats) {
+        let result = `| — | **${row.reportName}** | — | <em>Not deployed in this run</em> | — | —`;
         for (let i = 1; i <= maxReruns; i++) {
             result += ` | —`;
         }
