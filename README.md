@@ -170,9 +170,10 @@ The summary job produces one table with all test results, showing "Not deployed"
 
 ## Outputs
 
-| Name         | Description             |
-|--------------|-------------------------|
-| `report_url` | URL of the test report. |
+| Name               | Description                                                       |
+|--------------------|-------------------------------------------------------------------|
+| `report_url`       | URL of the test report.                                           |
+| `summary_page_url` | URL of the summary landing page (available when `prefix` is set). |
 
 
 ## Setup Notes
