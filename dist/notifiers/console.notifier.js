@@ -18,6 +18,9 @@ export class ConsoleNotifier {
         if (reportUrl) {
             console.log(`\n📊 Test report URL   : ${reportUrl}`);
         }
+        if (data.summaryPageUrl) {
+            console.log(`📋 Summary page URL  : ${data.summaryPageUrl}`);
+        }
         console.log(`\n${this.writeStatuses(data.resultStatus)}\n`);
     }
 }

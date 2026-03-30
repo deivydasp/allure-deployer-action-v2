@@ -85,6 +85,7 @@ async function runDeployMode() {
             duration: wallClockDuration,
             originalReportUrl: rerunInfo?.originalUrl,
             reruns: rerunInfo?.reruns,
+            summaryPageUrl: inputs.prefix ? normalizeUrl(pagesUrl) : undefined,
         });
     }
     catch (e) {

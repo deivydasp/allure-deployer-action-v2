@@ -14,7 +14,7 @@ export class GitHubNotifier {
         this.writeSummary = writeSummary ?? true;
     }
     async notify(data) {
-        const message = buildSummaryTable([
+        const table = buildSummaryTable([
             {
                 reportName: data.reportName ?? 'Allure Report',
                 reportUrl: data.originalReportUrl ?? data.reportUrl,
@@ -23,9 +23,15 @@ export class GitHubNotifier {
                 reruns: data.reruns,
             },
         ]);
+        const message = data.summaryPageUrl
+            ? `${table}\n\n> 📋 [Summary Page](${data.summaryPageUrl})`
+            : table;
         const promises = [];
         if (data.reportUrl) {
             promises.push(this.client.updateOutput({ name: 'report_url', value: data.reportUrl }));
+        }
+        if (data.summaryPageUrl) {
+            promises.push(this.client.updateOutput({ name: 'summary_page_url', value: data.summaryPageUrl }));
         }
         if (this.token && this.prComment && this.prNumber) {
             promises.push(this.client.updatePr({ message, token: this.token, prNumber: this.prNumber }));

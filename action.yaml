@@ -61,3 +61,5 @@ inputs:
 outputs:
   report_url:
     description: "URL to your test report"
+  summary_page_url:
+    description: "URL to the summary landing page (available when prefix is set)"

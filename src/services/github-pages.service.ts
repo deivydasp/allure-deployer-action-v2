@@ -192,11 +192,41 @@ export class GithubPagesService implements HostingProvider {
                 return;
             }
             await generateSummary(rootDir, summaries);
+            await this.injectDeployBanner(rootDir);
             await this.git.add(path.join(rootDir, 'index.html'));
             info('Root summary page created');
         } catch (e) {
             warning(`Failed to create root summary page: ${e}`);
         }
+    }
+
+    /**
+     * Injects a staleness-detection script into the summary page.
+     * Writes a _version file (committed alongside index.html) and embeds a script
+     * that fetches _version from raw.githubusercontent.com (updates instantly after push,
+     * unlike the Pages CDN). If versions differ, a banner warns the user that
+     * they're seeing stale content. Fails silently on private repos / GHES.
+     */
+    private async injectDeployBanner(rootDir: string): Promise<void> {
+        const version = Date.now().toString();
+        const versionPath = path.join(rootDir, '_version');
+        await writeFile(versionPath, version, 'utf8');
+        await this.git.add(versionPath);
+
+        const indexPath = path.join(rootDir, 'index.html');
+        let html = await readFile(indexPath, 'utf8');
+
+        const rawUrl = `https://raw.githubusercontent.com/${this.owner}/${this.repo}/${this.branch}/${this.pagesSourcePath ? this.pagesSourcePath + '/' : ''}_version`;
+
+        const script = `<script>(function(){var v="${version}";var u="${rawUrl}";fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.text():Promise.reject()}).then(function(t){if(t.trim()!==v){var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f Deployment in progress \\u2014 you may be seeing outdated results. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})})();</script>`;
+
+        if (html.includes('</head>')) {
+            html = html.replace('</head>', `${script}</head>`);
+        } else {
+            html += script;
+        }
+
+        await writeFile(indexPath, html, 'utf8');
     }
 
     /** Deletes old Allure reports, keeping the latest `inputs.keep` */

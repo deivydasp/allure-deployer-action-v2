@@ -8,4 +8,5 @@ export interface NotificationData {
     duration?: number;
     originalReportUrl?: string;
     reruns?: { attempt: number; url: string }[];
+    summaryPageUrl?: string;
 }
