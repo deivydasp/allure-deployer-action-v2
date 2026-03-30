@@ -36,7 +36,7 @@ export class GithubStorage implements IStorage {
         }
     }
 
-    private unzipToStaging(zipFilePath: string, outputDir: string): Promise<boolean> {
+    private unzipToStaging(zipFilePath: string, outputDir: string): Promise<void> {
         const resolvedOutput = path.resolve(outputDir);
         return new Promise((resolve, reject) => {
             const writePromises: Promise<void>[] = [];
@@ -69,7 +69,7 @@ export class GithubStorage implements IStorage {
                 .on('close', async () => {
                     try {
                         await Promise.all(writePromises);
-                        resolve(true);
+                        resolve();
                     } catch (err: unknown) {
                         reject(err);
                     }
@@ -115,7 +115,7 @@ export class GithubStorage implements IStorage {
         }
 
         const limit = pLimit(this.args.fileProcessingConcurrency);
-        const tasks: Promise<any>[] = [];
+        const tasks: Promise<void>[] = [];
         const [latest, ...outdated] = files;
         for (const file of outdated) {
             tasks.push(
@@ -123,9 +123,7 @@ export class GithubStorage implements IStorage {
                     try {
                         await this.provider.deleteFile(file.id);
                     } catch (error) {
-                        if (error instanceof RequestError && error.status === 404) {
-                            warning(`History artifact ${file.id} already deleted (likely by a concurrent workflow)`);
-                        } else if (error instanceof RequestError && error.status === 403) {
+                        if (error instanceof RequestError && error.status === 403) {
                             warning(
                                 `Failed to delete outdated Allure History file. Ensure that GitHub token has 'actions: write' permission`,
                             );

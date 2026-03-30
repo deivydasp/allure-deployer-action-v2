@@ -27,7 +27,7 @@ export class GithubPagesService implements HostingProvider {
     readonly owner: string;
     private readonly token: string;
     private readonly reportDir: string;
-    pagesSourcePath: string;
+    private readonly pagesSourcePath: string;
     private readonly pageUrl: string;
 
     constructor(config: GitHubConfig) {
@@ -69,7 +69,7 @@ export class GithubPagesService implements HostingProvider {
         // Running sequentially to avoid git lock issues
         await this.deleteOldReports();
         if (inputs.prefix) {
-            await this.createRedirectPage(normalizeUrl(`${this.pageUrl}`));
+            await this.createRedirectPage(this.pageUrl);
             await this.createRootSummaryPage();
         }
 
@@ -123,14 +123,12 @@ export class GithubPagesService implements HostingProvider {
 
     /** Creates a redirect page for the Allure report */
     private async createRedirectPage(redirectUrl: string): Promise<void> {
-        const escapedUrl = normalizeUrl(`${redirectUrl}/index.html`).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        const targetUrl = normalizeUrl(`${redirectUrl}/index.html`);
+        const escaped = targetUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const htmlContent = `<!DOCTYPE html>
-<meta charset="utf-8">
-<meta http-equiv="refresh" content="0; URL=${escapedUrl}">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">`;
+<html><head><script>window.location.replace("${escaped}");</script></head><body></body></html>`;
 
-        const filePath = path.join(inputs.WORKSPACE, this.pagesSourcePath ?? '', inputs.prefix ?? '', 'index.html');
+        const filePath = path.join(inputs.WORKSPACE, this.pagesSourcePath, inputs.prefix ?? '', 'index.html');
         await writeFile(filePath, htmlContent);
         await this.git.add(filePath);
         info(`Redirect 'index.html' created at ${path.posix.join(this.pagesSourcePath || '/', inputs.prefix ?? '')}`);
@@ -139,7 +137,7 @@ export class GithubPagesService implements HostingProvider {
     /** Creates a root index.html summary page using allure's built-in summary generator */
     private async createRootSummaryPage(): Promise<void> {
         try {
-            const rootDir = path.join(inputs.WORKSPACE, this.pagesSourcePath ?? '');
+            const rootDir = path.join(inputs.WORKSPACE, this.pagesSourcePath);
             const entries = await readdir(rootDir, { withFileTypes: true });
 
             const summaries: Record<string, unknown>[] = [];
@@ -210,11 +208,8 @@ export class GithubPagesService implements HostingProvider {
             // Single pass: filter report directories (name is a Date.now() timestamp)
             const reports: { dir: string; name: string }[] = [];
             for (const entry of entries) {
-                if (!entry.isDirectory()) continue;
-                const dirPath = path.join(entry.parentPath, entry.name);
-                if (existsSync(path.join(dirPath, 'index.html'))) {
-                    reports.push({ dir: dirPath, name: entry.name });
-                }
+                if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue;
+                reports.push({ dir: path.join(entry.parentPath, entry.name), name: entry.name });
             }
 
             // Account for the incoming report (not yet on disk) by keeping one fewer old report

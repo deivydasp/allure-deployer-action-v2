@@ -1,8 +1,8 @@
 import { endGroup, error, info, setFailed, startGroup, warning } from '@actions/core';
 import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
-import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
 import { ExecutorInterface } from './interfaces/executor.interface.js';
@@ -183,14 +183,7 @@ function createGitHubPagesService({
     reportDir,
     pageUrl,
     pagesSourcePath,
-}: {
-    token: string;
-    owner: string;
-    repo: string;
-    reportDir: string;
-    pageUrl: string;
-    pagesSourcePath: string;
-}): GithubPagesService {
+}: Omit<GitHubConfig, 'branch'>): GithubPagesService {
     const branch = inputs.github_pages_branch ?? 'gh-pages';
     const config: GitHubConfig = {
         owner,
@@ -349,10 +342,11 @@ async function finalizeDeployment({
     reportDir: string;
 }) {
     info('Finalizing deployment...');
+    // Copy report before deploy — deploy's push retry does git reset --hard which wipes the working tree
+    await copyReportToCustomDir(reportDir);
     await Promise.all([
         host.deploy(),
         storage?.uploadArtifacts(),
-        copyReportToCustomDir(reportDir),
     ]);
     info('Deployment finalized.');
 }
@@ -509,16 +503,16 @@ async function findDeployMetasForRun(
     for (const dir of runDirs) {
         const metaPath = path.join(prefixDir, dir, 'deploy.json');
         try {
-            if (existsSync(metaPath)) {
-                const raw = JSON.parse(await readFile(metaPath, 'utf8'));
-                if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
-                if (raw.runId === runId) {
-                    deployMetas.push({ dir, meta: raw as DeployMeta });
-                    if (raw.runAttempt === 1) break;
-                }
+            const raw = JSON.parse(await readFile(metaPath, 'utf8'));
+            if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number') continue;
+            if (raw.runId === runId) {
+                deployMetas.push({ dir, meta: raw as DeployMeta });
+                if (raw.runAttempt === 1) break;
             }
         } catch (e) {
-            warning(`Failed to read deploy.json in ${dir}: ${e}`);
+            if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+                warning(`Failed to read deploy.json in ${dir}: ${e}`);
+            }
         }
     }
     return deployMetas;
@@ -528,8 +522,6 @@ interface SummaryJson {
     name?: string;
     stats?: ReportStatistic;
     statistic?: ReportStatistic;
-    duration?: number;
-    href?: string;
 }
 
 /** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */
