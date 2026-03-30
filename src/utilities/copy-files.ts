@@ -1,5 +1,5 @@
 import path from 'node:path';
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 import { warning } from '@actions/core';
 import pLimit from 'p-limit';
 

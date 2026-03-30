@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 
 export async function validateResultsPaths(commaSeparatedResultPaths: string): Promise<string[]> {
     if (!commaSeparatedResultPaths.includes(',')) {

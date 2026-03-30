@@ -1,5 +1,5 @@
 import { info, warning } from '@actions/core';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 
 /**
  * Configuration for retry logic

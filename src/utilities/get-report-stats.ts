@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ReportStatistic } from '../interfaces/report-statistic.js';
 
