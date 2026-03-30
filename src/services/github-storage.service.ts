@@ -1,9 +1,10 @@
-import { IStorage, Order } from '../shared/index.js';
+import { IStorage } from '../interfaces/storage.interface.js';
+import { Order } from '../interfaces/storage-provider.interface.js';
 import path from 'node:path';
 import { access, mkdir } from 'node:fs/promises';
 import { createReadStream, createWriteStream, mkdirSync } from 'node:fs';
 import pLimit from 'p-limit';
-import { ArtifactService } from '../services/artifact.service.js';
+import { ArtifactService } from './artifact.service.js';
 import unzipper, { Entry } from 'unzipper';
 import { RequestError } from '@octokit/request-error';
 import { warning } from '@actions/core';

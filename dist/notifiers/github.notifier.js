@@ -1,32 +1,19 @@
 import { warning } from '@actions/core';
-import { GithubInterface } from '../../interfaces/github.interface.js';
-import { NotificationData, Notifier } from '../../shared/index.js';
-import { GitHubService } from '../../services/github.service.js';
-import { buildSummaryTable } from '../../utilities/summary-table.js';
-
-export type GitHubNotifierConfig = {
-    client: GithubInterface;
-    prNumber?: number;
-    token?: string;
-    prComment?: boolean;
-    writeSummary?: boolean;
-};
-
-export class GitHubNotifier implements Notifier {
-    client: GitHubService;
-    prNumber?: number;
-    token?: string;
-    prComment?: boolean;
-    writeSummary: boolean;
-    constructor({ client, prNumber, prComment, token, writeSummary }: GitHubNotifierConfig) {
+import { buildSummaryTable } from '../utilities/summary-table.js';
+export class GitHubNotifier {
+    client;
+    prNumber;
+    token;
+    prComment;
+    writeSummary;
+    constructor({ client, prNumber, prComment, token, writeSummary }) {
         this.client = client;
         this.prNumber = prNumber;
         this.token = token;
         this.prComment = prComment;
         this.writeSummary = writeSummary ?? true;
     }
-
-    async notify(data: NotificationData): Promise<void> {
+    async notify(data) {
         const message = buildSummaryTable([
             {
                 reportName: data.reportName ?? 'Allure Report',
@@ -36,8 +23,7 @@ export class GitHubNotifier implements Notifier {
                 reruns: data.reruns,
             },
         ]);
-
-        const promises: Promise<void>[] = [];
+        const promises = [];
         if (data.reportUrl) {
             promises.push(this.client.updateOutput({ name: 'report_url', value: data.reportUrl }));
         }

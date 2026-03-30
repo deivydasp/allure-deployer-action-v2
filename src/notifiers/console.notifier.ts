@@ -1,6 +1,6 @@
 import { Notifier } from '../interfaces/notifier.interface.js';
-import { NotificationData } from '../types/notification-data.js';
-import { ReportStatistic } from '../types/report-statistic.js';
+import { NotificationData } from '../interfaces/notification-data.js';
+import { ReportStatistic } from '../interfaces/report-statistic.js';
 
 export class ConsoleNotifier implements Notifier {
     private writeStatuses(status: ReportStatistic): string {

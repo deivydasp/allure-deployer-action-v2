@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'node:path';
-import { ReportStatistic } from '../types/report-statistic.js';
+import { ReportStatistic } from '../interfaces/report-statistic.js';
 
 async function readJsonFile(filePath: string): Promise<any> {
     const absolutePath = path.resolve(filePath);

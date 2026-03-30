@@ -1,5 +1,5 @@
 import { warning } from '@actions/core';
-import { NotificationData } from '../types/notification-data.js';
+import { NotificationData } from '../interfaces/notification-data.js';
 import { Notifier } from '../interfaces/notifier.interface.js';
 
 export class NotifyHandler {

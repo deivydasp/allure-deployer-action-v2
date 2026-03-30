@@ -5,31 +5,26 @@ import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
-import { GithubStorage, GithubStorageConfig } from './features/github-storage.js';
-import { GithubHost } from './features/hosting/github.host.js';
-import { GitHubNotifier } from './features/messaging/github-notifier.js';
+import { ExecutorInterface } from './interfaces/executor.interface.js';
+import { HostingProvider } from './interfaces/hosting-provider.interface.js';
+import { NotificationData } from './interfaces/notification-data.js';
+import { Notifier } from './interfaces/notifier.interface.js';
+import { ReportStatistic } from './interfaces/report-statistic.js';
+import { IStorage } from './interfaces/storage.interface.js';
 import inputs from './io.js';
+import { ConsoleNotifier } from './notifiers/console.notifier.js';
+import { GitHubNotifier } from './notifiers/github.notifier.js';
+import { NotifyHandler } from './notifiers/notify-handler.js';
+import { Allure, AllureConfig } from './services/allure-report.service.js';
 import { ArtifactService, ArtifactServiceConfig } from './services/artifact.service.js';
 import { GitHubConfig, GithubPagesService } from './services/github-pages.service.js';
+import { GithubStorage, GithubStorageConfig } from './services/github-storage.service.js';
 import { GitHubService } from './services/github.service.js';
-import {
-    Allure,
-    AllureConfig,
-    ConsoleNotifier,
-    copyFiles,
-    ExecutorInterface,
-    getReportStats,
-    getTestDuration,
-    HostingProvider,
-    IStorage,
-    NotificationData,
-    Notifier,
-    NotifyHandler,
-    ReportStatistic,
-    validateResultsPaths,
-} from './shared/index.js';
+import { copyFiles } from './utilities/copy-files.js';
+import { getReportStats, getTestDuration } from './utilities/get-report-stats.js';
 import { buildSummaryTable, DeployMeta, RerunInfo, SummaryRow } from './utilities/summary-table.js';
 import { copyDirectory } from './utilities/util.js';
+import { validateResultsPaths } from './utilities/validate-results-paths.js';
 
 export async function main() {
     if (inputs.mode !== 'deploy' && inputs.mode !== 'summary') {
@@ -62,7 +57,7 @@ async function runDeployMode() {
         const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
         const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
-        const host = getGitHubHost({
+        const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
             repo,
@@ -78,7 +73,7 @@ async function runDeployMode() {
             throw new Error(`No valid allure results found at: ${inputs.allure_results_path}`);
         }
         const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
-        const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
+        const reportUrl = await stageDeployment({ host: ghPages, storage, RESULTS_PATHS: resultPaths });
         const config: AllureConfig = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
@@ -93,7 +88,7 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const reportStats = await getReportStats(reportDir);
-        await finalizeDeployment({ host, storage, reportDir });
+        await finalizeDeployment({ host: ghPages, storage, reportDir });
         const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
@@ -115,7 +110,7 @@ async function runSummaryMode() {
 
         // Clone gh-pages (read-only)
         await mkdir(inputs.WORKSPACE, { recursive: true });
-        const host = getGitHubHost({
+        const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
             repo,
@@ -123,7 +118,7 @@ async function runSummaryMode() {
             reportDir: inputs.WORKSPACE,
             pagesSourcePath,
         });
-        await host.init();
+        await ghPages.setupBranch();
 
         // Scan prefixes and read summary.json from each
         const rootDir = path.join(inputs.WORKSPACE, pagesSourcePath);
@@ -181,7 +176,7 @@ async function validateGitHubPages() {
     return { owner, repo, pagesSourcePath, pagesUrl: data.html_url };
 }
 
-function getGitHubHost({
+function createGitHubPagesService({
     token,
     owner,
     repo,
@@ -195,7 +190,7 @@ function getGitHubHost({
     reportDir: string;
     pageUrl: string;
     pagesSourcePath: string;
-}): GithubHost {
+}): GithubPagesService {
     const branch = inputs.github_pages_branch ?? 'gh-pages';
     const config: GitHubConfig = {
         owner,
@@ -206,7 +201,7 @@ function getGitHubHost({
         pageUrl,
         pagesSourcePath,
     };
-    return new GithubHost(new GithubPagesService(config));
+    return new GithubPagesService(config);
 }
 
 async function initializeStorage(

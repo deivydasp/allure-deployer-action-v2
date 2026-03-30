@@ -7,7 +7,7 @@ import pLimit from 'p-limit';
 import { info, warning } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
-import { GithubPagesInterface } from '../interfaces/github-pages.interface.js';
+import { HostingProvider } from '../interfaces/hosting-provider.interface.js';
 import { allFulfilledResults, removeTrailingSlash, withRetry } from '../utilities/util.js';
 
 export type GitHubConfig = {
@@ -20,7 +20,7 @@ export type GitHubConfig = {
     pagesSourcePath: string;
 };
 
-export class GithubPagesService implements GithubPagesInterface {
+export class GithubPagesService implements HostingProvider {
     private git: SimpleGit;
     readonly branch: string;
     readonly repo: string;
@@ -39,6 +39,14 @@ export class GithubPagesService implements GithubPagesInterface {
         this.git = simpleGit();
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
+    }
+
+    async init(): Promise<string> {
+        return this.setupBranch();
+    }
+
+    async deploy(): Promise<void> {
+        return this.deployPages();
     }
 
     /** Deploys the Allure report to GitHub Pages */

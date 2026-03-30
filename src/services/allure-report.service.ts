@@ -2,39 +2,55 @@ import * as fs from 'fs/promises';
 import * as path from 'node:path';
 import { info, warning } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
-import { AllureService } from '../services/allure.service.js';
+import { CommandRunner } from '../interfaces/command.interface.js';
+import { ExecutorInterface } from '../interfaces/executor.interface.js';
+import { AllureService } from './allure.service.js';
+
+export interface AllureConfig {
+    RESULTS_STAGING_PATH: string;
+    REPORTS_DIR: string;
+    HISTORY_PATH: string;
+    historyLimit: number;
+    showHistory: boolean;
+    reportName?: string;
+    reportLanguage?: string;
+}
+
 export class Allure {
-    allureRunner;
-    config;
-    constructor({ allureRunner, config }) {
+    private readonly allureRunner: CommandRunner;
+    private readonly config: AllureConfig;
+
+    constructor({ allureRunner, config }: { allureRunner?: CommandRunner; config: AllureConfig }) {
         this.allureRunner = allureRunner ?? new AllureService();
         this.config = config;
     }
-    readEnvironments() {
+
+    readEnvironments(): Map<string, string> | undefined {
         try {
             const properties = propertiesReader({
                 sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
-            const map = new Map();
+            const map = new Map<string, string>();
             info('Environments');
             for (const [key, value] of properties.entries()) {
                 info(`${key}: ${value}`);
                 map.set(key, String(value));
             }
             return map;
-        }
-        catch (e) {
-            if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+        } catch (e) {
+            if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'ENOENT') {
                 return undefined;
             }
             throw e;
         }
     }
-    async generate(executor) {
+
+    async generate(executor?: ExecutorInterface): Promise<string> {
         if (executor) {
             const executorPath = path.join(this.config.RESULTS_STAGING_PATH, 'executor.json');
             await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
+
         const configPath = await this.writeAllureConfig();
         const command = [
             'generate',
@@ -44,22 +60,25 @@ export class Allure {
             '--output',
             this.config.REPORTS_DIR,
         ];
+
         const { exitCode, stdout, stderr } = await this.allureRunner.runCommand(command);
-        if (stdout)
-            info(stdout);
+        if (stdout) info(stdout);
         if (exitCode !== 0) {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
+
         if (this.config.showHistory) {
             await this.postProcessHistory(executor?.reportUrl);
             if (executor?.reportUrl) {
                 await this.createHistoryRedirect();
             }
         }
+
         return this.config.REPORTS_DIR;
     }
-    async writeAllureConfig() {
-        const allurerc = {
+
+    private async writeAllureConfig(): Promise<string> {
+        const allurerc: Record<string, unknown> = {
             name: this.config.reportName ?? 'Allure Report',
             appendHistory: true,
             plugins: {
@@ -71,38 +90,43 @@ export class Allure {
                 },
             },
         };
+
         if (this.config.showHistory) {
             allurerc.historyPath = this.config.HISTORY_PATH;
             allurerc.historyLimit = this.config.historyLimit;
         }
+
         const configPath = path.join(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
         await fs.writeFile(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
         return configPath;
     }
+
     /**
      * Patches the latest history entry with the report URL and truncates to the history limit.
      */
-    async postProcessHistory(reportUrl) {
+    private async postProcessHistory(reportUrl?: string): Promise<void> {
         try {
             const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
             const trimmed = content.trimEnd();
-            if (!trimmed)
-                return;
+            if (!trimmed) return;
             let lines = trimmed.split('\n');
+
             if (reportUrl) {
                 const lastEntry = JSON.parse(lines[lines.length - 1]);
                 lastEntry.url = reportUrl;
                 lines[lines.length - 1] = JSON.stringify(lastEntry);
             }
+
             if (lines.length > this.config.historyLimit) {
                 lines = lines.slice(-this.config.historyLimit);
             }
+
             await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
-        }
-        catch (e) {
+        } catch (e) {
             warning(`Failed to post-process history: ${e}`);
         }
     }
+
     /**
      * Creates an awesome/index.html redirect in the report directory.
      * Allure 3's awesome theme appends /awesome to history URLs, but single-plugin
@@ -110,23 +134,20 @@ export class Allure {
      * so the SPA can route to the correct test result.
      * Skipped when awesome/ already exists (multi-plugin mode).
      */
-    async createHistoryRedirect() {
+    private async createHistoryRedirect(): Promise<void> {
         try {
             const awesomeDir = path.join(this.config.REPORTS_DIR, 'awesome');
             try {
                 const stat = await fs.stat(awesomeDir);
-                if (stat.isDirectory())
-                    return; // multi-plugin mode — awesome/ is a real plugin output
-            }
-            catch {
+                if (stat.isDirectory()) return; // multi-plugin mode — awesome/ is a real plugin output
+            } catch {
                 // doesn't exist — create the redirect
             }
             await fs.mkdir(awesomeDir, { recursive: true });
             const html = `<!DOCTYPE html>
 <html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
             await fs.writeFile(path.join(awesomeDir, 'index.html'), html, 'utf8');
-        }
-        catch (e) {
+        } catch (e) {
             warning(`Failed to create history redirect: ${e}`);
         }
     }

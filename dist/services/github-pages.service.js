@@ -27,6 +27,12 @@ export class GithubPagesService {
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
     }
+    async init() {
+        return this.setupBranch();
+    }
+    async deploy() {
+        return this.deployPages();
+    }
     /** Deploys the Allure report to GitHub Pages */
     async deployPages() {
         if (!existsSync(this.reportDir)) {

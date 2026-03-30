@@ -1,4 +1,4 @@
-import { Order } from '../shared/index.js';
+import { Order } from '../interfaces/storage-provider.interface.js';
 import { DefaultArtifactClient } from '@actions/artifact';
 import pLimit from 'p-limit';
 import { DEFAULT_RETRY_CONFIG, allFulfilledResults, withRetry } from '../utilities/util.js';

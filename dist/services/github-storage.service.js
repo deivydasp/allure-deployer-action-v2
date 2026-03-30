@@ -1,4 +1,4 @@
-import { Order } from '../shared/index.js';
+import { Order } from '../interfaces/storage-provider.interface.js';
 import path from 'node:path';
 import { access, mkdir } from 'node:fs/promises';
 import { createReadStream, createWriteStream, mkdirSync } from 'node:fs';

@@ -5,16 +5,20 @@ import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
-import { GithubStorage } from './features/github-storage.js';
-import { GithubHost } from './features/hosting/github.host.js';
-import { GitHubNotifier } from './features/messaging/github-notifier.js';
 import inputs from './io.js';
+import { ConsoleNotifier } from './notifiers/console.notifier.js';
+import { GitHubNotifier } from './notifiers/github.notifier.js';
+import { NotifyHandler } from './notifiers/notify-handler.js';
+import { Allure } from './services/allure-report.service.js';
 import { ArtifactService } from './services/artifact.service.js';
 import { GithubPagesService } from './services/github-pages.service.js';
+import { GithubStorage } from './services/github-storage.service.js';
 import { GitHubService } from './services/github.service.js';
-import { Allure, ConsoleNotifier, copyFiles, getReportStats, getTestDuration, NotifyHandler, validateResultsPaths, } from './shared/index.js';
+import { copyFiles } from './utilities/copy-files.js';
+import { getReportStats, getTestDuration } from './utilities/get-report-stats.js';
 import { buildSummaryTable } from './utilities/summary-table.js';
 import { copyDirectory } from './utilities/util.js';
+import { validateResultsPaths } from './utilities/validate-results-paths.js';
 export async function main() {
     if (inputs.mode !== 'deploy' && inputs.mode !== 'summary') {
         setFailed(`Invalid mode '${inputs.mode}'. Expected 'deploy' or 'summary'.`);
@@ -42,7 +46,7 @@ async function runDeployMode() {
         const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
         const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
-        const host = getGitHubHost({
+        const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
             repo,
@@ -56,7 +60,7 @@ async function runDeployMode() {
             throw new Error(`No valid allure results found at: ${inputs.allure_results_path}`);
         }
         const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
-        const reportUrl = await stageDeployment({ host, storage, RESULTS_PATHS: resultPaths });
+        const reportUrl = await stageDeployment({ host: ghPages, storage, RESULTS_PATHS: resultPaths });
         const config = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
@@ -71,7 +75,7 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const reportStats = await getReportStats(reportDir);
-        await finalizeDeployment({ host, storage, reportDir });
+        await finalizeDeployment({ host: ghPages, storage, reportDir });
         const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
@@ -92,7 +96,7 @@ async function runSummaryMode() {
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
         // Clone gh-pages (read-only)
         await mkdir(inputs.WORKSPACE, { recursive: true });
-        const host = getGitHubHost({
+        const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
             repo,
@@ -100,7 +104,7 @@ async function runSummaryMode() {
             reportDir: inputs.WORKSPACE,
             pagesSourcePath,
         });
-        await host.init();
+        await ghPages.setupBranch();
         // Scan prefixes and read summary.json from each
         const rootDir = path.join(inputs.WORKSPACE, pagesSourcePath);
         const rows = await scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath);
@@ -150,7 +154,7 @@ async function validateGitHubPages() {
     const pagesSourcePath = data.source.path.startsWith('/') ? data.source.path.slice(1) : data.source.path;
     return { owner, repo, pagesSourcePath, pagesUrl: data.html_url };
 }
-function getGitHubHost({ token, owner, repo, reportDir, pageUrl, pagesSourcePath, }) {
+function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, pagesSourcePath, }) {
     const branch = inputs.github_pages_branch ?? 'gh-pages';
     const config = {
         owner,
@@ -161,7 +165,7 @@ function getGitHubHost({ token, owner, repo, reportDir, pageUrl, pagesSourcePath
         pageUrl,
         pagesSourcePath,
     };
-    return new GithubHost(new GithubPagesService(config));
+    return new GithubPagesService(config);
 }
 async function initializeStorage(owner, repo) {
     const config = {

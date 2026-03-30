@@ -69,41 +69,50 @@ The action has two modes controlled by the `mode` input:
 
 ```
 src/
-├── index.ts                          # Entry point → calls main()
-├── main.ts                           # Core orchestration
-├── io.ts                             # Reads GitHub Actions inputs
-├── interfaces/                       # Interfaces for this repo's services
-├── features/
-│   ├── github-storage.ts             # IStorage impl using GitHub Artifacts
-│   ├── hosting/github.host.ts        # HostingProvider impl for GitHub Pages
-│   └── messaging/github-notifier.ts  # Notifier impl for PR comments + job summary
-├── services/
-│   ├── github-pages.service.ts       # Git operations (clone, commit, push, cleanup, summary page)
-│   ├── artifact.service.ts           # GitHub Artifacts API (upload/download/list/delete)
-│   └── github.service.ts             # GitHub API (PR comments, outputs, summaries)
-├── utilities/
-│   ├── util.ts                       # Retry logic, file helpers
-│   ├── summary-table.ts              # Summary table rendering (pie charts, dots, rerun columns)
-│   └── cleanup.ts                    # Post-action cleanup (no-op)
-└── shared/                           # Inlined abstractions (formerly allure-deployer-shared)
-    ├── index.ts                      # Barrel export
-    ├── interfaces/                   # HostingProvider, IStorage, StorageProvider, Notifier, etc.
-    ├── types/                        # ReportStatistic, NotificationData
-    ├── features/                     # Allure report gen (allurerc config, history post-processing)
-    ├── services/                     # AllureService (CLI wrapper via child_process.spawn)
-    └── utilities/                    # NotifyHandler, validateResultsPaths, copyFiles, getReportStats
+├── index.ts                              # Entry point → calls main()
+├── main.ts                               # Core orchestration
+├── io.ts                                 # Reads GitHub Actions inputs
+├── interfaces/                           # All interfaces and types
+│   ├── command.interface.ts              # CommandRunner (CLI execution contract)
+│   ├── executor.interface.ts             # ExecutorInterface (report metadata)
+│   ├── github.interface.ts               # GithubInterface (PR, summary, output)
+│   ├── hosting-provider.interface.ts     # HostingProvider (init/deploy)
+│   ├── inputs.interface.ts               # Inputs, DefaultConfig
+│   ├── notification-data.ts              # NotificationData type
+│   ├── notifier.interface.ts             # Notifier (notify contract)
+│   ├── report-statistic.ts              # ReportStatistic type
+│   ├── storage.interface.ts              # IStorage (stage/upload)
+│   └── storage-provider.interface.ts     # StorageProvider, StorageFile, Order
+├── services/                             # All service implementations
+│   ├── allure.service.ts                 # Allure CLI spawner (child_process)
+│   ├── allure-report.service.ts          # Report generation (allurerc config, history post-processing)
+│   ├── artifact.service.ts               # GitHub Artifacts API (upload/download/list/delete)
+│   ├── github.service.ts                 # GitHub API (PR comments, outputs, summaries)
+│   ├── github-pages.service.ts           # Git operations (clone, commit, push, cleanup, summary page)
+│   └── github-storage.service.ts         # IStorage impl using GitHub Artifacts
+├── notifiers/                            # Notification implementations
+│   ├── console.notifier.ts              # Console output notifier
+│   ├── github.notifier.ts               # PR comments + job summary notifier
+│   └── notify-handler.ts                 # Orchestrates multiple notifiers
+└── utilities/
+    ├── cleanup.ts                        # Post-action cleanup (no-op)
+    ├── copy-files.ts                     # Concurrent file copying
+    ├── get-report-stats.ts               # Report statistics extraction
+    ├── summary-table.ts                  # Summary table rendering (pie charts, dots, rerun columns)
+    ├── util.ts                           # Retry logic, file helpers
+    └── validate-results-paths.ts         # Input path validation
 scripts/
-    └── patch-dist-package.js         # Adds d3-time override to dist/main/package.json
+    └── patch-dist-package.js             # Adds d3-time override to dist/main/package.json
 ```
 
 ### Key Modules
 
-- **`src/services/github-pages.service.ts`** — The most complex file. Handles git clone (shallow, depth=1), branch creation (uses `git ls-remote --symref HEAD` to discover default branch), old report cleanup (sorts by timestamp directory name, accounts for incoming report in `keep` count), redirect page (HTML-escaped URLs), root summary page (via `@allurereport/summary`), and commit+push with retry. On concurrent push conflicts, lazily backs up the report, resets to remote, restores and re-applies all changes cleanly.
-- **`src/shared/features/allure.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
-- **`src/shared/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
-- **`src/features/github-storage.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Handles concurrent artifact deletion gracefully (404 = already deleted by parallel workflow).
+- **`src/services/github-pages.service.ts`** — The most complex file. Implements `HostingProvider` directly. Handles git clone (shallow, depth=1), branch creation (uses `git ls-remote --symref HEAD` to discover default branch), old report cleanup (sorts by timestamp directory name, accounts for incoming report in `keep` count), redirect page (HTML-escaped URLs), root summary page (via `@allurereport/summary`), and commit+push with retry. On concurrent push conflicts, lazily backs up the report, resets to remote, restores and re-applies all changes cleanly.
+- **`src/services/allure-report.service.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
+- **`src/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
+- **`src/services/github-storage.service.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Handles concurrent artifact deletion gracefully (404 = already deleted by parallel workflow).
 - **`src/services/artifact.service.ts`** — Low-level GitHub Artifacts API wrapper using Octokit. Handles download via HTTPS streams, non-mutating sorting by creation time, permission checking. Delete operations treat 404 as success (concurrent deletion by parallel workflows).
-- **`src/shared/utilities/get-report-stats.ts`** — Reads report statistics from `summary.json` (supporting both `stats` and `statistic` fields for v2/v3 compat), falling back to `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
+- **`src/utilities/get-report-stats.ts`** — Reads report statistics from `summary.json` (supporting both `stats` and `statistic` fields for v2/v3 compat), falling back to `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
 
 ## Key Patterns
 
