@@ -49,6 +49,12 @@ export class GithubPagesService {
     async prepareAndCommit() {
         // Running sequentially to avoid git lock issues
         await this.deleteOldReports();
+        // Disable Jekyll processing so files like _version are served correctly
+        const nojekyllPath = path.join(inputs.WORKSPACE, this.pagesSourcePath, '.nojekyll');
+        if (!existsSync(nojekyllPath)) {
+            await writeFile(nojekyllPath, '', 'utf8');
+            await this.git.add(nojekyllPath);
+        }
         if (inputs.prefix) {
             await this.createRedirectPage(this.pageUrl);
             await this.createRootSummaryPage();
