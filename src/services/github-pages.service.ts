@@ -231,7 +231,8 @@ export class GithubPagesService implements HostingProvider {
         let html = await readFile(indexPath, 'utf8');
 
         const script = [
-            '<script>(function(){var v="', version, '";var done=false;var start=Date.now();',
+            '<script>document.addEventListener("DOMContentLoaded",function(){',
+            'var v="', version, '";var done=false;var start=Date.now();',
             'var expected=new URLSearchParams(location.search).get("v");',
             'var el=null;',
             'function banner(msg,btn){if(el)el.remove();',
@@ -254,7 +255,7 @@ export class GithubPagesService implements HostingProvider {
             'c();var i=setInterval(function(){c();if(Date.now()-start>300000&&!done)',
             '{clearInterval(i);i=setInterval(c,30000)}},10000);',
             'document.addEventListener("visibilitychange",function(){if(!document.hidden)c()})',
-            '})();</script>',
+            '});</script>',
         ].join('');
 
         if (html.includes('</head>')) {
