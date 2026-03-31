@@ -63,7 +63,13 @@ The action has two modes controlled by the `mode` input:
 
 ### Root Summary Page
 
-`src/services/github-pages.service.ts` generates a root `index.html` on gh-pages using `@allurereport/summary` (same SPA as the official allure3-demo). It scans all prefix directories, reads each latest report's `summary.json` for stats, and produces an interactive landing page. Generated as part of `prepareAndCommit`, which also runs during push retries on the latest remote state, so it always reflects reports from parallel workflows. A staleness-detection script is injected: it writes a `_version` file and embeds a client-side check that fetches `_version` from `raw.githubusercontent.com` (updates instantly after push, unlike the Pages CDN). If versions differ, an orange warning banner with a refresh button is shown. The summary page URL is surfaced as the `summary_page_url` action output and shown in job summary, PR comments, and console output (only when `prefix` is set).
+`src/services/github-pages.service.ts` generates a root `index.html` on gh-pages using `@allurereport/summary` (same SPA as the official allure3-demo). It scans all prefix directories, reads each latest report's `summary.json` for stats, and produces an interactive landing page. Generated as part of `prepareAndCommit`, which also runs during push retries on the latest remote state, so it always reflects reports from parallel workflows. A `.nojekyll` file is added to ensure all files (including `_version`) are served correctly.
+
+**Staleness detection banner**: The summary page includes a client-side script that detects stale content via two mechanisms:
+1. **Deploy-in-progress**: The summary page URL in job summary/PR includes `?v=<timestamp>`. If the page's embedded version differs from the URL param, it shows a "Deployment in progress" banner (no refresh button) — polling continues until the deploy completes, then transitions to the next banner.
+2. **Newer version available**: Polls `_version` from the same Pages origin with cache-busting (10s for first 5 min, then 30s). When a new deploy completes and `_version` changes, shows "A newer version is available" with a refresh button.
+
+The summary page URL is surfaced as the `summary_page_url` action output and shown in job summary, PR comments, and console output (only when `prefix` is set).
 
 ### Source Structure
 

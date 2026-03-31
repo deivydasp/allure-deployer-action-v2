@@ -212,12 +212,14 @@ export class GithubPagesService implements HostingProvider {
 
     /**
      * Injects a staleness-detection script into the summary page.
-     * Writes a _version file (timestamp) committed alongside index.html. The script
-     * polls _version from the same Pages origin with cache-busting. Polls every 10s
-     * for the first 5 minutes (user likely just deployed), then every 30s after.
-     * When a new deploy completes, _version changes — triggers an orange "newer
-     * version available" banner with refresh button. Stops polling once shown.
-     * Pauses polling when tab is hidden, checks immediately on focus.
+     * Writes a _version file (timestamp) committed alongside index.html. The script:
+     * - If `?v=` query param is present and differs from the embedded version, shows
+     *   "Deployment in progress" banner immediately (no refresh button).
+     * - Polls `_version` from the same Pages origin with cache-busting (10s for first
+     *   5 minutes, then 30s). When the fetched version differs, replaces any existing
+     *   banner with "A newer version is available" (with refresh button) and stops polling.
+     * - Pauses polling when tab is hidden, checks immediately on focus.
+     * - Pushes page content down so the banner doesn't overlap.
      * Works for both public and private repos since it uses the same origin.
      */
     private async injectDeployBanner(rootDir: string): Promise<void> {
@@ -232,7 +234,7 @@ export class GithubPagesService implements HostingProvider {
 
         const script = [
             '<script>document.addEventListener("DOMContentLoaded",function(){',
-            'var v="', version, '";var done=false;var start=Date.now();',
+            'var v="', version, '";var done=false;var slow=false;',
             'var expected=new URLSearchParams(location.search).get("v");',
             'var el=null;',
             'function banner(msg,btn){if(el)el.remove();',
@@ -243,7 +245,7 @@ export class GithubPagesService implements HostingProvider {
             'b.innerHTML=msg+(btn?\'<button onclick="location.reload()"style="background:#fff;',
             'color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;',
             'font:inherit;font-weight:600">\\u21bb Refresh</button>\':"");',
-            'document.body.prepend(b);el=b}',
+            'document.body.prepend(b);document.body.style.marginTop=b.offsetHeight+"px";el=b}',
             'if(expected&&expected!==v)banner("\\u26a0\\ufe0f Deployment in progress \\u2014',
             ' you may be seeing outdated results.\\xa0",false);',
             'function c(){if(done)return;',
@@ -252,8 +254,8 @@ export class GithubPagesService implements HostingProvider {
             '.then(function(t){if(t.trim()!==v){done=true;clearInterval(i);',
             'banner("\\u26a0\\ufe0f A newer version is available.\\xa0",true)}})',
             '.catch(function(){})}',
-            'c();var i=setInterval(function(){c();if(Date.now()-start>300000&&!done)',
-            '{clearInterval(i);i=setInterval(c,30000)}},10000);',
+            'c();var i=setInterval(function(){if(!slow&&Date.now()-', version, '>300000)',
+            '{slow=true;clearInterval(i);i=setInterval(c,30000)}else{c()}},10000);',
             'document.addEventListener("visibilitychange",function(){if(!document.hidden)c()})',
             '});</script>',
         ].join('');
