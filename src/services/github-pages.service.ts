@@ -211,11 +211,11 @@ export class GithubPagesService implements HostingProvider {
     /**
      * Injects a staleness-detection script into the summary page.
      * Writes a _version file (committed alongside index.html) and embeds a script
-     * that fetches _version from the same Pages origin with cache-busting. When the
-     * page is stale (Pages CDN hasn't updated yet), the fetched _version still has
-     * the old value — so versions match and no banner shows. Once _version updates
-     * before index.html (small files propagate faster), the mismatch triggers the
-     * banner. Works for both public and private repos since it uses the same origin.
+     * that polls _version from the same Pages origin with cache-busting. When a new
+     * deployment completes on the CDN, _version returns a different value than what's
+     * embedded in the (now stale) page — triggering an orange banner with a refresh
+     * button. Polls every 30s indefinitely while the tab is visible (pauses when hidden).
+     * Works for both public and private repos since it uses the same origin.
      */
     private async injectDeployBanner(rootDir: string): Promise<void> {
         const version = Date.now().toString();
@@ -226,10 +226,7 @@ export class GithubPagesService implements HostingProvider {
         const indexPath = path.join(rootDir, 'index.html');
         let html = await readFile(indexPath, 'utf8');
 
-        // Fetch _version from same origin with cache-busting query param.
-        // Poll every 10s for 5 minutes — once _version updates (small file, propagates
-        // faster than index.html), the mismatch triggers the banner.
-        const script = `<script>(function(){var v="${version}";function c(){fetch("_version?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.text():Promise.reject()}).then(function(t){if(t.trim()!==v){var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f Deployment in progress \\u2014 you may be seeing outdated results. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})}c();var n=0;var i=setInterval(function(){n++;if(n>=30){clearInterval(i);return}c()},10000)})();</script>`;
+        const script = `<script>(function(){var v="${version}";var shown=false;function c(){if(shown)return;fetch("_version?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.text():Promise.reject()}).then(function(t){if(t.trim()!==v&&!shown){shown=true;clearInterval(i);var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f A newer version is available. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})}c();var i=setInterval(c,30000);document.addEventListener("visibilitychange",function(){if(!document.hidden)c()})})();</script>`;
 
         if (html.includes('</head>')) {
             html = html.replace('</head>', `${script}</head>`);
