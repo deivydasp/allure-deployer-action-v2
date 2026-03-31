@@ -17,6 +17,8 @@ export class GithubPagesService {
     reportDir;
     pagesSourcePath;
     pageUrl;
+    /** Set during deploy — the version timestamp embedded in the summary page */
+    deployVersion;
     constructor(config) {
         this.branch = config.branch;
         this.owner = config.owner;
@@ -171,21 +173,48 @@ export class GithubPagesService {
     }
     /**
      * Injects a staleness-detection script into the summary page.
-     * Writes a _version file (committed alongside index.html) and embeds a script
-     * that polls _version from the same Pages origin with cache-busting. When a new
-     * deployment completes on the CDN, _version returns a different value than what's
-     * embedded in the (now stale) page — triggering an orange banner with a refresh
-     * button. Polls every 30s indefinitely while the tab is visible (pauses when hidden).
+     * Writes a _version file (timestamp) committed alongside index.html. The script
+     * polls _version from the same Pages origin with cache-busting. Polls every 10s
+     * for the first 5 minutes (user likely just deployed), then every 30s after.
+     * When a new deploy completes, _version changes — triggers an orange "newer
+     * version available" banner with refresh button. Stops polling once shown.
+     * Pauses polling when tab is hidden, checks immediately on focus.
      * Works for both public and private repos since it uses the same origin.
      */
     async injectDeployBanner(rootDir) {
         const version = Date.now().toString();
+        this.deployVersion = version;
         const versionPath = path.join(rootDir, '_version');
         await writeFile(versionPath, version, 'utf8');
         await this.git.add(versionPath);
         const indexPath = path.join(rootDir, 'index.html');
         let html = await readFile(indexPath, 'utf8');
-        const script = `<script>(function(){var v="${version}";var shown=false;function c(){if(shown)return;fetch("_version?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.text():Promise.reject()}).then(function(t){if(t.trim()!==v&&!shown){shown=true;clearInterval(i);var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f A newer version is available. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})}c();var i=setInterval(c,30000);document.addEventListener("visibilitychange",function(){if(!document.hidden)c()})})();</script>`;
+        const script = [
+            '<script>(function(){var v="', version, '";var done=false;var start=Date.now();',
+            'var expected=new URLSearchParams(location.search).get("v");',
+            'var el=null;',
+            'function banner(msg,btn){if(el)el.remove();',
+            'var b=document.createElement("div");',
+            'b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00',
+            ';color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;',
+            'display:flex;align-items:center;justify-content:center;gap:8px";',
+            'b.innerHTML=msg+(btn?\'<button onclick="location.reload()"style="background:#fff;',
+            'color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;',
+            'font:inherit;font-weight:600">\\u21bb Refresh</button>\':"");',
+            'document.body.prepend(b);el=b}',
+            'if(expected&&expected!==v)banner("\\u26a0\\ufe0f Deployment in progress \\u2014',
+            ' you may be seeing outdated results.\\xa0",false);',
+            'function c(){if(done)return;',
+            'fetch("_version?t="+Date.now(),{cache:"no-store"})',
+            '.then(function(r){return r.ok?r.text():Promise.reject()})',
+            '.then(function(t){if(t.trim()!==v){done=true;clearInterval(i);',
+            'banner("\\u26a0\\ufe0f A newer version is available.\\xa0",true)}})',
+            '.catch(function(){})}',
+            'c();var i=setInterval(function(){c();if(Date.now()-start>300000&&!done)',
+            '{clearInterval(i);i=setInterval(c,30000)}},10000);',
+            'document.addEventListener("visibilitychange",function(){if(!document.hidden)c()})',
+            '})();</script>',
+        ].join('');
         if (html.includes('</head>')) {
             html = html.replace('</head>', `${script}</head>`);
         }
