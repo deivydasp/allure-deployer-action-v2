@@ -64,7 +64,7 @@ function buildRow(row: SummaryRow, maxReruns: number): string {
 
     const duration = row.duration ? formatDuration(row.duration) : '';
     const reportCol = row.reportUrl
-        ? `<a href="${row.reportUrl}" target="_blank">View</a>`
+        ? `<a href="${row.reportUrl}">View</a>`
         : '';
 
     let result = `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total} | ${reportCol}`;
@@ -72,7 +72,7 @@ function buildRow(row: SummaryRow, maxReruns: number): string {
     // Add rerun columns
     for (let i = 1; i <= maxReruns; i++) {
         const rerun = row.reruns?.find((r) => r.attempt === i + 1);
-        result += ` | ${rerun ? `<a href="${rerun.url}" target="_blank">View</a>` : '—'}`;
+        result += ` | ${rerun ? `<a href="${rerun.url}">View</a>` : '—'}`;
     }
 
     return `${result} |`;
