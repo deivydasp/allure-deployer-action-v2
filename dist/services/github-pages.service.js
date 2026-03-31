@@ -166,9 +166,10 @@ export class GithubPagesService {
     /**
      * Injects a staleness-detection script into the summary page.
      * Writes a _version file (committed alongside index.html) and embeds a script
-     * that fetches _version from raw.githubusercontent.com (updates instantly after push,
-     * unlike the Pages CDN). If versions differ, a banner warns the user that
-     * they're seeing stale content. Fails silently on private repos / GHES.
+     * that checks the GitHub API for the latest _version file content. The API
+     * updates immediately after push (unlike Pages CDN or raw.githubusercontent.com
+     * which are CDN-cached). If versions differ, an orange banner warns the user.
+     * Fails silently on private repos, GHES, or API rate limits.
      */
     async injectDeployBanner(rootDir) {
         const version = Date.now().toString();
@@ -177,8 +178,9 @@ export class GithubPagesService {
         await this.git.add(versionPath);
         const indexPath = path.join(rootDir, 'index.html');
         let html = await readFile(indexPath, 'utf8');
-        const rawUrl = `https://raw.githubusercontent.com/${this.owner}/${this.repo}/${this.branch}/${this.pagesSourcePath ? this.pagesSourcePath + '/' : ''}_version`;
-        const script = `<script>(function(){var v="${version}";var u="${rawUrl}";fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.text():Promise.reject()}).then(function(t){if(t.trim()!==v){var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f Deployment in progress \\u2014 you may be seeing outdated results. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})})();</script>`;
+        const contentsPath = this.pagesSourcePath ? `${this.pagesSourcePath}/_version` : '_version';
+        const apiUrl = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${contentsPath}?ref=${this.branch}`;
+        const script = `<script>(function(){var v="${version}";fetch("${apiUrl}").then(function(r){return r.ok?r.json():Promise.reject()}).then(function(j){var r=atob(j.content).trim();if(r!==v){var b=document.createElement("div");b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef6c00;color:#fff;padding:10px 16px;font:14px/1.4 -apple-system,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px";b.innerHTML='\\u26a0\\ufe0f Deployment in progress \\u2014 you may be seeing outdated results. <button onclick="location.reload()" style="background:#fff;color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit;font-weight:600">\\u21bb Refresh</button>';document.body.prepend(b)}}).catch(function(){})})();</script>`;
         if (html.includes('</head>')) {
             html = html.replace('</head>', `${script}</head>`);
         }
