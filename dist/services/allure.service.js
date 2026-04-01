@@ -21,9 +21,17 @@ export class AllureService {
         const allureCli = resolveAllureCli();
         const ac = new AbortController();
         const timeout = setTimeout(() => ac.abort(), TIMEOUT_MS);
+        // Strip CodeBuild env vars so Allure's CI auto-detection falls through to GitHub Actions.
+        // On CodeBuild-backed self-hosted runners, these vars cause Allure to generate AWS Console
+        // links instead of GitHub Actions links in summary.json jobHref.
+        const env = { ...process.env };
+        delete env.CODEBUILD_BUILD_ID;
+        delete env.CODEBUILD_BUILD_URL;
+        delete env.CODEBUILD_BUILD_ARN;
         const allureProcess = spawn(process.execPath, [allureCli, ...args], {
             stdio: ['ignore', 'pipe', 'pipe'],
             signal: ac.signal,
+            env
         });
         let stdout = '';
         let stderr = '';
