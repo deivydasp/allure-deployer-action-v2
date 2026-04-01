@@ -19,7 +19,8 @@ Deploy Allure 3 test reports to GitHub Pages with History, Report Aggregation, a
 - **Re-run tracking** — detects re-run attempts via `deploy.json` metadata
 - **PR comments** with test results summary
 - **Multi-project** support via `prefix` — multiple test suites on one GitHub Pages site
-- **Concurrent-safe** — parallel workflows can deploy different prefixes simultaneously
+- **Concurrent-safe** — parallel workflows can deploy different prefixes simultaneously (5 push retries)
+- **Cache-proof redirects** — prefix redirect pages always resolve the latest report, even when browser-cached
 
 ## Example 1: Deploy to GitHub Pages
 

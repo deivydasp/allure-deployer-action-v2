@@ -95,13 +95,20 @@ export class GithubPagesService {
         }
         return this.pageUrl;
     }
-    /** Creates a redirect page for the Allure report */
+    /** Creates a redirect page that dynamically resolves the latest report URL.
+     *  Writes the target URL to a `_latest` file and the redirect page fetches it
+     *  with cache-busting, so even a browser-cached page always finds the current report. */
     async createRedirectPage(redirectUrl) {
         const targetUrl = normalizeUrl(`${redirectUrl}/index.html`);
-        const escaped = targetUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const prefixDir = path.join(inputs.WORKSPACE, this.pagesSourcePath, inputs.prefix ?? '');
+        // Write target URL to _latest (fetched dynamically by the redirect page)
+        const latestPath = path.join(prefixDir, '_latest');
+        await writeFile(latestPath, targetUrl, 'utf8');
+        await this.git.add(latestPath);
+        // Redirect page fetches _latest with cache-busting to always get the current target
         const htmlContent = `<!DOCTYPE html>
-<html><head><script>window.location.replace("${escaped}");</script></head><body></body></html>`;
-        const filePath = path.join(inputs.WORKSPACE, this.pagesSourcePath, inputs.prefix ?? '', 'index.html');
+<html><head><script>fetch("_latest?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(u){window.location.replace(u.trim())}).catch(function(){document.body.textContent="Failed to load report. Please refresh."});</script></head><body></body></html>`;
+        const filePath = path.join(prefixDir, 'index.html');
         await writeFile(filePath, htmlContent);
         await this.git.add(filePath);
         info(`Redirect 'index.html' created at ${path.posix.join(this.pagesSourcePath || '/', inputs.prefix ?? '')}`);
