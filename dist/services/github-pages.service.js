@@ -7,7 +7,7 @@ import pLimit from 'p-limit';
 import { info, warning } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
-import { allFulfilledResults, removeTrailingSlash, withRetry } from '../utilities/util.js';
+import { allFulfilledResults, DEFAULT_RETRY_CONFIG, removeTrailingSlash, withRetry } from '../utilities/util.js';
 export class GithubPagesService {
     git;
     branch;
@@ -300,7 +300,7 @@ export class GithubPagesService {
                     }
                     throw error;
                 }
-            });
+            }, { ...DEFAULT_RETRY_CONFIG, maxRetries: 5 });
         }
         finally {
             if (backupCreated) {

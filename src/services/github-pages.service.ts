@@ -8,7 +8,7 @@ import { info, warning } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
 import { HostingProvider } from '../interfaces/hosting-provider.interface.js';
-import { allFulfilledResults, removeTrailingSlash, withRetry } from '../utilities/util.js';
+import { allFulfilledResults, DEFAULT_RETRY_CONFIG, removeTrailingSlash, withRetry } from '../utilities/util.js';
 
 export type GitHubConfig = {
     owner: string;
@@ -350,7 +350,7 @@ export class GithubPagesService implements HostingProvider {
                     }
                     throw error;
                 }
-            });
+            }, { ...DEFAULT_RETRY_CONFIG, maxRetries: 5 });
         } finally {
             if (backupCreated) {
                 await rm(backupDir, { recursive: true, force: true });
