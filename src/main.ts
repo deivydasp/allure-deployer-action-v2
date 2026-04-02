@@ -137,8 +137,10 @@ async function runSummaryMode() {
         }
 
         const table = buildSummaryTable(rows);
+        const summaryPageLink = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" align="absmiddle" />&nbsp;&nbsp;<a href="${normalizeUrl(pagesUrl)}">Summary Page</a>`;
+        const message = `${summaryPageLink}\n\n${table}`;
         const githubService = new GitHubService();
-        await githubService.updateSummary(table);
+        await githubService.updateSummary(message);
         info(`Summary table written with ${rows.length} report(s).`);
     } catch (e) {
         setFailed(`Summary failed: ${e instanceof Error ? e.message : e}`);
