@@ -39,7 +39,7 @@ Uses the **`allure` npm package (v3.x)** — a pure JavaScript CLI (no Java requ
 Key details:
 - **Config-driven**: `src/services/allure-report.service.ts` generates `allurerc.json` at runtime with plugin config, history path, and history limit
 - **CLI invocation**: `src/services/allure.service.ts` spawns `node cli.js` (resolved from the allure package) as a child process. Uses `AbortController` with a 5-minute timeout. Listens on `close` event (not `exit`) to ensure stdio streams are fully flushed before reading output.
-- **History**: Uses JSONL format (`history.jsonl`) stored as GitHub Artifacts. The `allure awesome` plugin reads/appends history via `--history-path` config. Post-generation, history is truncated to the `keep` limit and patched with the report URL for clickable history links.
+- **History**: Uses JSONL format (`history.jsonl`) stored on the gh-pages branch at `{prefix}/history/history.jsonl`. After shallow clone, history is already on disk. The `allure awesome` plugin reads/appends history via `--history-path` config. Post-generation, history is truncated to the `keep` limit and patched with the report URL for clickable history links. History is committed atomically with the report.
 - **History redirect**: Creates `awesome/index.html` redirect in single-plugin reports because Allure 3's awesome theme appends `/awesome` to history URLs
 
 ### Two Modes (src/main.ts)
@@ -48,10 +48,10 @@ The action has two modes controlled by the `mode` input:
 
 **Deploy mode** (`mode: deploy`, default):
 1. **Validate** — Checks GitHub token, verifies Pages is configured for the target branch
-2. **Stage** — Copies allure-results to staging, downloads history.jsonl from GitHub Artifacts (runs sequentially to avoid memory spikes)
+2. **Stage** — Copies allure-results to staging. History is already available on disk from the shallow clone at `{prefix}/history/history.jsonl`.
 3. **Generate** — Uses `allure generate --config allurerc.json` via `src/services/allure-report.service.ts` to produce the HTML report, then post-processes history (URL patching + truncation)
 4. **Metadata** — Writes `deploy.json` to the report directory with `runId`, `runAttempt`, `wallClockDuration`, `timestamp` for summary mode and re-run tracking
-5. **Deploy** — Report stats and custom dir copy are done *before* deploy to avoid race conditions with `git reset --hard`. Then `prepareAndCommit` (delete old reports, redirect page, summary page, stage, commit), then push with retry. On push rejection, backup is created lazily (only on first rejection to skip I/O on happy path), then resets to latest remote, restores from backup, re-runs `prepareAndCommit`, and pushes again. Upload history artifact runs in parallel with deploy.
+5. **Deploy** — Report stats and custom dir copy are done *before* deploy to avoid race conditions with `git reset --hard`. Then `prepareAndCommit` (delete old reports, redirect page, summary page, stage report + history, commit), then push with retry. On push rejection, backup is created lazily (only on first rejection to skip I/O on happy path) for both report and history, then resets to latest remote, restores from backup, re-runs `prepareAndCommit`, and pushes again.
 6. **Notify** — Console, GitHub PR comment, and Actions job summary (skipped when `summary: false`). Includes summary page URL link (with allure logo icon) when `prefix` is set.
 
 **Summary mode** (`mode: summary`):
@@ -86,16 +86,12 @@ src/
 │   ├── inputs.interface.ts               # Inputs, DefaultConfig
 │   ├── notification-data.ts              # NotificationData type
 │   ├── notifier.interface.ts             # Notifier (notify contract)
-│   ├── report-statistic.ts              # ReportStatistic type
-│   ├── storage.interface.ts              # IStorage (stage/upload)
-│   └── storage-provider.interface.ts     # StorageProvider, StorageFile, Order
+│   └── report-statistic.ts              # ReportStatistic type
 ├── services/                             # All service implementations
 │   ├── allure.service.ts                 # Allure CLI spawner (child_process)
 │   ├── allure-report.service.ts          # Report generation (allurerc config, history post-processing)
-│   ├── artifact.service.ts               # GitHub Artifacts API (upload/download/list/delete)
 │   ├── github.service.ts                 # GitHub API (PR comments, outputs, summaries)
-│   ├── github-pages.service.ts           # Git operations (clone, commit, push, cleanup, summary page)
-│   └── github-storage.service.ts         # IStorage impl using GitHub Artifacts
+│   └── github-pages.service.ts           # Git operations (clone, commit, push, cleanup, summary page, history)
 ├── notifiers/                            # Notification implementations
 │   ├── console.notifier.ts              # Console output notifier
 │   ├── github.notifier.ts               # PR comments + job summary notifier
@@ -116,18 +112,14 @@ scripts/
 - **`src/services/github-pages.service.ts`** — The most complex file. Implements `HostingProvider` directly. Handles git clone (shallow, depth=1), branch creation (uses `git ls-remote --symref HEAD` to discover default branch), old report cleanup (filters by numeric timestamp directory name, accounts for incoming report in `keep` count), redirect page (dynamic — writes target URL to `_latest` file, redirect page fetches it with cache-busting so even a cached page always resolves the current report), root summary page (via `@allurereport/summary`), and commit+push with retry (5 attempts). On concurrent push conflicts, lazily backs up the report, resets to remote, restores and re-applies all changes cleanly.
 - **`src/services/allure-report.service.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
 - **`src/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
-- **`src/services/github-storage.service.ts`** — Downloads previous history.jsonl from GitHub Artifacts, stages it for allure, uploads the updated file after report generation. Handles concurrent artifact deletion gracefully (404 = already deleted by parallel workflow).
-- **`src/services/artifact.service.ts`** — Low-level GitHub Artifacts API wrapper using Octokit (API version `2026-03-10`). Downloads artifacts via Octokit's built-in redirect-following, non-mutating sorting by creation time, permission checking. Delete operations treat 404 as success (concurrent deletion by parallel workflows).
 - **`src/utilities/get-report-stats.ts`** — Reads report statistics from `summary.json` (supporting both `stats` and `statistic` fields for v2/v3 compat), falling back to `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
 
 ## Key Patterns
 
 - **Dependency injection** — services passed as constructor args (e.g., `GithubHost` wraps `GithubPagesService`)
-- **Interface segregation** — small interfaces: `HostingProvider` (init/deploy), `IStorage` (stage/upload), `Notifier` (notify)
+- **Interface segregation** — small interfaces: `HostingProvider` (init/deploy), `Notifier` (notify)
 - **Retry with exponential backoff** — `withRetry()` in `src/utilities/util.ts` (3 retries, 1-10s delay, 2x backoff). Preserves original error as `cause` on the wrapping error for stack trace debugging.
-- **Concurrency control** — `p-limit` for parallel file operations and API calls
-- **Sequential staging** — git clone and file copy run concurrently via `Promise.all` (safe rejection handling), then artifact download runs after both complete to control memory on runners
-- **Graceful degradation** — if GitHub token lacks `actions: write`, history is skipped with a warning instead of failing
+- **Concurrency control** — `p-limit` for parallel file operations
 - **Consistent logging** — all logging uses `@actions/core` (`info`, `warning`, `error`, `setFailed`) for proper GitHub Actions UI integration. All `catch` blocks log warnings (no silent swallowing).
 - **Consistent fs imports** — named imports from `node:fs` (sync) and `node:fs/promises` (async) throughout. No `fs.promises.*` pattern.
 - **Input validation** — empty result paths throw early with clear message, `runAttempt` is coerced to number with fallback to 1, branch defaults are applied before validation

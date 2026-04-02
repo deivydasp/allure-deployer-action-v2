@@ -19,6 +19,8 @@ export class GithubPagesService {
     pageUrl;
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion;
+    /** Set before deploy — path to history.jsonl on gh-pages, staged in prepareAndCommit */
+    historyPath;
     constructor(config) {
         this.branch = config.branch;
         this.owner = config.owner;
@@ -65,6 +67,10 @@ export class GithubPagesService {
             throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
         }
         await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
+        // Stage history file alongside the report (lives at {prefix}/history/history.jsonl)
+        if (this.historyPath && existsSync(this.historyPath)) {
+            await this.git.add(this.historyPath);
+        }
         await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
     }
     /** Initializes and sets up the branch for GitHub Pages deployment */
@@ -280,6 +286,7 @@ export class GithubPagesService {
     async gitPushWithRetry() {
         // Backup created lazily on first push rejection — avoids unnecessary I/O on happy path
         const backupDir = path.join(path.dirname(inputs.WORKSPACE), 'report-backup');
+        const historyBackupDir = path.join(path.dirname(inputs.WORKSPACE), 'history-backup');
         let backupCreated = false;
         try {
             await withRetry(async () => {
@@ -294,15 +301,22 @@ export class GithubPagesService {
                     await this.git.fetch('origin', this.branch, { '--depth': 1 });
                     await this.git.reset(['--hard', `origin/${this.branch}`]);
                     await cp(backupDir, this.reportDir, { recursive: true });
+                    // Restore history backup — overwrites remote history with our generated version
+                    if (this.historyPath && existsSync(historyBackupDir)) {
+                        await cp(historyBackupDir, path.dirname(this.historyPath), { recursive: true });
+                    }
                     await this.prepareAndCommit();
                 }
                 try {
                     await this.git.push('origin', this.branch);
                 }
                 catch (error) {
-                    // Back up report before retry — reset --hard will wipe the working tree
+                    // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {
                         await cp(this.reportDir, backupDir, { recursive: true });
+                        if (this.historyPath && existsSync(path.dirname(this.historyPath))) {
+                            await cp(path.dirname(this.historyPath), historyBackupDir, { recursive: true });
+                        }
                         backupCreated = true;
                     }
                     throw error;
@@ -312,6 +326,7 @@ export class GithubPagesService {
         finally {
             if (backupCreated) {
                 await rm(backupDir, { recursive: true, force: true });
+                await rm(historyBackupDir, { recursive: true, force: true });
             }
         }
     }

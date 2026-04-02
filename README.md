@@ -30,7 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
     steps:
       - uses: actions/checkout@v6
       - name: Run tests
@@ -53,7 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
       pull-requests: write
       issues: write
     steps:
@@ -99,7 +97,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
     steps:
       - uses: actions/checkout@v6
       - run: # Run API tests
@@ -114,7 +111,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
     steps:
       - uses: actions/checkout@v6
       - run: # Run E2E tests
@@ -180,7 +176,7 @@ The summary job produces one table with all test results, showing "Not deployed"
 ## Setup Notes
 
 - **GitHub Pages:**
-  - `github_token` must have `contents: write` (to push report files) and `actions: write` (to back up history as GitHub Artifacts).
+  - `github_token` must have `contents: write` (to push report files). History is stored on the gh-pages branch alongside reports — no `actions: write` needed.
   - GitHub Pages must be configured to deploy from the `github_pages_branch` (default: `gh-pages`).
   - Summary mode only needs `contents: read`.
 - **Pull Request Comments:**

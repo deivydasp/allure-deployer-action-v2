@@ -10,15 +10,12 @@ import { HostingProvider } from './interfaces/hosting-provider.interface.js';
 import { NotificationData } from './interfaces/notification-data.js';
 import { Notifier } from './interfaces/notifier.interface.js';
 import { ReportStatistic } from './interfaces/report-statistic.js';
-import { IStorage } from './interfaces/storage.interface.js';
 import inputs from './io.js';
 import { ConsoleNotifier } from './notifiers/console.notifier.js';
 import { GitHubNotifier } from './notifiers/github.notifier.js';
 import { NotifyHandler } from './notifiers/notify-handler.js';
 import { Allure, AllureConfig } from './services/allure-report.service.js';
-import { ArtifactService, ArtifactServiceConfig } from './services/artifact.service.js';
 import { GitHubConfig, GithubPagesService } from './services/github-pages.service.js';
-import { GithubStorage, GithubStorageConfig } from './services/github-storage.service.js';
 import { GitHubService } from './services/github.service.js';
 import { copyFiles } from './utilities/copy-files.js';
 import { getReportStats, getTestDuration } from './utilities/get-report-stats.js';
@@ -72,12 +69,19 @@ async function runDeployMode() {
         if (resultPaths.length === 0) {
             throw new Error(`No valid allure results found at: ${inputs.allure_results_path}`);
         }
-        const storage = inputs.show_history ? await initializeStorage(owner, repo) : undefined;
-        const reportUrl = await stageDeployment({ host: ghPages, storage, RESULTS_PATHS: resultPaths });
+        const reportUrl = await stageDeployment({ host: ghPages, RESULTS_PATHS: resultPaths });
+
+        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
+        const historyDir = path.join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
+        const historyPath = path.join(historyDir, 'history.jsonl');
+        if (inputs.show_history) {
+            await mkdir(historyDir, { recursive: true });
+        }
+
         const config: AllureConfig = {
             RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
             REPORTS_DIR: reportDir,
-            HISTORY_PATH: inputs.HISTORY_PATH,
+            HISTORY_PATH: historyPath,
             historyLimit: inputs.keep,
             showHistory: inputs.show_history,
             reportName: inputs.report_name,
@@ -88,7 +92,7 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const reportStats = await getReportStats(reportDir);
-        await finalizeDeployment({ host: ghPages, storage, reportDir });
+        await finalizeDeployment({ host: ghPages, reportDir, historyPath });
         const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
@@ -200,45 +204,17 @@ function createGitHubPagesService({
     return new GithubPagesService(config);
 }
 
-async function initializeStorage(
-    owner: string,
-    repo: string,
-): Promise<IStorage | undefined> {
-    const config: ArtifactServiceConfig = {
-        owner,
-        repo,
-        token: inputs.github_token,
-    };
-    const service = new ArtifactService(config);
-    if (await service.hasArtifactReadPermission()) {
-        const storageConfig: GithubStorageConfig = {
-            ARCHIVE_DIR: inputs.ARCHIVE_DIR,
-            RESULTS_STAGING_PATH: inputs.RESULTS_STAGING_PATH,
-            HISTORY_PATH: inputs.HISTORY_PATH,
-            fileProcessingConcurrency: inputs.fileProcessingConcurrency,
-            showHistory: inputs.show_history,
-        };
-        return new GithubStorage(service, storageConfig);
-    }
-    warning(
-        "GitHub token does not have 'actions: write' permission to access GitHub Artifacts. History will not be included in test reports",
-    );
-    return undefined;
-}
-
 async function stageDeployment({
-    storage,
     host,
     RESULTS_PATHS,
 }: {
-    storage?: IStorage;
     host: HostingProvider;
     RESULTS_PATHS: string[];
 }) {
     info('Staging files...');
 
     // host.init (git clone) and copyFiles run concurrently.
-    // stageFilesFromStorage (artifact download + unzip) runs after both complete to avoid memory spikes on small runners.
+    // After clone, history is already available on disk at {prefix}/history/history.jsonl.
     const [result] = await Promise.all([
         host.init(),
         copyFiles({
@@ -247,9 +223,6 @@ async function stageDeployment({
             concurrency: inputs.fileProcessingConcurrency,
         }),
     ]);
-    if (inputs.show_history) {
-        await storage?.stageFilesFromStorage();
-    }
     info('Files staged successfully.');
     return result;
 }
@@ -336,21 +309,19 @@ function createGitHubBuildUrl(): string {
 }
 
 async function finalizeDeployment({
-    storage,
     host,
     reportDir,
+    historyPath,
 }: {
-    storage?: IStorage;
     host: HostingProvider;
     reportDir: string;
+    historyPath: string;
 }) {
     info('Finalizing deployment...');
     // Copy report before deploy — deploy's push retry does git reset --hard which wipes the working tree
     await copyReportToCustomDir(reportDir);
-    await Promise.all([
-        host.deploy(),
-        storage?.uploadArtifacts(),
-    ]);
+    (host as GithubPagesService).historyPath = historyPath;
+    await host.deploy();
     info('Deployment finalized.');
 }
 
