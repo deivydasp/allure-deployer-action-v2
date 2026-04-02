@@ -212,7 +212,7 @@ export class GithubPagesService {
             'color:#ef6c00;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;',
             'font:inherit;font-weight:600">\\u21bb Refresh</button>\':"");',
             'document.body.prepend(b);document.body.style.marginTop=b.offsetHeight+"px";el=b}',
-            'if(expected&&expected!==v)banner("\\u26a0\\ufe0f Deployment in progress \\u2014',
+            'if(expected&&Number(expected)>Number(v))banner("\\u26a0\\ufe0f Deployment in progress \\u2014',
             ' you may be seeing outdated results.\\xa0",false);',
             'function c(){if(done)return;',
             'fetch("_version?t="+Date.now(),{cache:"no-store"})',
