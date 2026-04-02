@@ -30,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Run tests
@@ -52,6 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: read
       pull-requests: write
       issues: write
     steps:
@@ -97,6 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - run: # Run API tests
@@ -111,6 +114,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - run: # Run E2E tests
@@ -127,6 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pages: read
     steps:
       - uses: deivydasp/allure-deployer-action@v2
         with:
@@ -176,9 +181,10 @@ The summary job produces one table with all test results, showing "Not deployed"
 ## Setup Notes
 
 - **GitHub Pages:**
-  - `github_token` must have `contents: write` (to push report files). History is stored on the gh-pages branch alongside reports — no `actions: write` needed.
+  - `github_token` must have `contents: write` (to push report files) and `pages: read` (to verify Pages configuration).
+  - History is stored on the gh-pages branch alongside reports — no `actions: write` needed.
   - GitHub Pages must be configured to deploy from the `github_pages_branch` (default: `gh-pages`).
-  - Summary mode only needs `contents: read`.
+  - Summary mode only needs `contents: read` and `pages: read`.
 - **Pull Request Comments:**
   - `github_token` must have `pull_requests: write` and `issues: write`.
 - **No Java Required:**
