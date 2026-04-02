@@ -18,6 +18,7 @@ export type GitHubConfig = {
     reportDir: string;
     pageUrl: string;
     pagesSourcePath: string;
+    historyPath?: string;
 };
 
 export class GithubPagesService implements HostingProvider {
@@ -31,8 +32,7 @@ export class GithubPagesService implements HostingProvider {
     private readonly pageUrl: string;
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion?: string;
-    /** Set before deploy — path to history.jsonl on gh-pages, staged in prepareAndCommit */
-    historyPath?: string;
+    private readonly historyPath?: string;
 
     constructor(config: GitHubConfig) {
         this.branch = config.branch;
@@ -43,6 +43,7 @@ export class GithubPagesService implements HostingProvider {
         this.git = simpleGit();
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
+        this.historyPath = config.historyPath;
     }
 
     async init(): Promise<string> {

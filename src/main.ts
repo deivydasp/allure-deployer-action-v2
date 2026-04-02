@@ -54,6 +54,10 @@ async function runDeployMode() {
         const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
         const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
+        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
+        const historyDir = path.join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
+        const historyPath = path.join(historyDir, 'history.jsonl');
+
         const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
@@ -61,6 +65,7 @@ async function runDeployMode() {
             pageUrl,
             reportDir,
             pagesSourcePath,
+            historyPath: inputs.show_history ? historyPath : undefined,
         });
 
         await mkdir(reportDir, { recursive: true, mode: 0o755 });
@@ -71,9 +76,6 @@ async function runDeployMode() {
         }
         const reportUrl = await stageDeployment({ host: ghPages, RESULTS_PATHS: resultPaths });
 
-        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
-        const historyDir = path.join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
-        const historyPath = path.join(historyDir, 'history.jsonl');
         if (inputs.show_history) {
             await mkdir(historyDir, { recursive: true });
         }
@@ -92,7 +94,7 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(inputs.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const reportStats = await getReportStats(reportDir);
-        await finalizeDeployment({ host: ghPages, reportDir, historyPath });
+        await finalizeDeployment({ host: ghPages, reportDir });
         const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
@@ -313,16 +315,13 @@ function createGitHubBuildUrl(): string {
 async function finalizeDeployment({
     host,
     reportDir,
-    historyPath,
 }: {
     host: HostingProvider;
     reportDir: string;
-    historyPath: string;
 }) {
     info('Finalizing deployment...');
     // Copy report before deploy — deploy's push retry does git reset --hard which wipes the working tree
     await copyReportToCustomDir(reportDir);
-    (host as GithubPagesService).historyPath = historyPath;
     await host.deploy();
     info('Deployment finalized.');
 }

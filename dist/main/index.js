@@ -44275,7 +44275,6 @@ class GithubPagesService {
     pageUrl;
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion;
-    /** Set before deploy — path to history.jsonl on gh-pages, staged in prepareAndCommit */
     historyPath;
     constructor(config) {
         this.branch = config.branch;
@@ -44286,6 +44285,7 @@ class GithubPagesService {
         this.git = esm_default();
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
+        this.historyPath = config.historyPath;
     }
     async init() {
         return this.setupBranch();
@@ -44830,6 +44830,9 @@ async function runDeployMode() {
         const reportSubDir = external_node_path_namespaceObject.join(pagesSourcePath, io.prefix ?? '', Date.now().toString());
         const reportDir = external_node_path_namespaceObject.join(io.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
+        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
+        const historyDir = external_node_path_namespaceObject.join(io.WORKSPACE, pagesSourcePath, io.prefix ?? '', 'history');
+        const historyPath = external_node_path_namespaceObject.join(historyDir, 'history.jsonl');
         const ghPages = createGitHubPagesService({
             token: io.github_token,
             owner,
@@ -44837,6 +44840,7 @@ async function runDeployMode() {
             pageUrl,
             reportDir,
             pagesSourcePath,
+            historyPath: io.show_history ? historyPath : undefined,
         });
         await (0,promises_namespaceObject.mkdir)(reportDir, { recursive: true, mode: 0o755 });
         const resultPaths = await validateResultsPaths(io.allure_results_path);
@@ -44844,9 +44848,6 @@ async function runDeployMode() {
             throw new Error(`No valid allure results found at: ${io.allure_results_path}`);
         }
         const reportUrl = await stageDeployment({ host: ghPages, RESULTS_PATHS: resultPaths });
-        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
-        const historyDir = external_node_path_namespaceObject.join(io.WORKSPACE, pagesSourcePath, io.prefix ?? '', 'history');
-        const historyPath = external_node_path_namespaceObject.join(historyDir, 'history.jsonl');
         if (io.show_history) {
             await (0,promises_namespaceObject.mkdir)(historyDir, { recursive: true });
         }
@@ -44864,7 +44865,7 @@ async function runDeployMode() {
         const wallClockDuration = await getTestDuration(io.RESULTS_STAGING_PATH);
         await writeDeployMeta(reportDir, wallClockDuration);
         const reportStats = await getReportStats(reportDir);
-        await finalizeDeployment({ host: ghPages, reportDir, historyPath });
+        await finalizeDeployment({ host: ghPages, reportDir });
         const rerunInfo = await detectReruns(reportDir, pagesUrl, pagesSourcePath);
         await sendNotifications({
             resultStatus: reportStats.statistic,
@@ -45042,11 +45043,10 @@ function createGitHubBuildUrl() {
     const { /* context */ "_": context } = github_namespaceObject;
     return normalizeUrl(`${github_context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`);
 }
-async function finalizeDeployment({ host, reportDir, historyPath, }) {
+async function finalizeDeployment({ host, reportDir, }) {
     info('Finalizing deployment...');
     // Copy report before deploy — deploy's push retry does git reset --hard which wipes the working tree
     await copyReportToCustomDir(reportDir);
-    host.historyPath = historyPath;
     await host.deploy();
     info('Deployment finalized.');
 }

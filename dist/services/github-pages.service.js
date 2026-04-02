@@ -19,7 +19,6 @@ export class GithubPagesService {
     pageUrl;
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion;
-    /** Set before deploy — path to history.jsonl on gh-pages, staged in prepareAndCommit */
     historyPath;
     constructor(config) {
         this.branch = config.branch;
@@ -30,6 +29,7 @@ export class GithubPagesService {
         this.git = simpleGit();
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
+        this.historyPath = config.historyPath;
     }
     async init() {
         return this.setupBranch();
