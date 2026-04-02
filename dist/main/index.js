@@ -44948,7 +44948,7 @@ async function validateGitHubPages() {
     const pagesSourcePath = data.source.path.startsWith('/') ? data.source.path.slice(1) : data.source.path;
     return { owner, repo, pagesSourcePath, pagesUrl: data.html_url };
 }
-function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, pagesSourcePath, }) {
+function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, pagesSourcePath, historyPath, }) {
     const branch = io.github_pages_branch ?? 'gh-pages';
     const config = {
         owner,
@@ -44958,6 +44958,7 @@ function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, page
         reportDir,
         pageUrl,
         pagesSourcePath,
+        historyPath,
     };
     return new GithubPagesService(config);
 }

@@ -194,6 +194,7 @@ function createGitHubPagesService({
     reportDir,
     pageUrl,
     pagesSourcePath,
+    historyPath,
 }: Omit<GitHubConfig, 'branch'>): GithubPagesService {
     const branch = inputs.github_pages_branch ?? 'gh-pages';
     const config: GitHubConfig = {
@@ -204,6 +205,7 @@ function createGitHubPagesService({
         reportDir,
         pageUrl,
         pagesSourcePath,
+        historyPath,
     };
     return new GithubPagesService(config);
 }
