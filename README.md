@@ -12,7 +12,7 @@ Deploy Allure 3 test reports to GitHub Pages with History, Report Aggregation, a
 
 - Generates **Allure 3** reports (no Java required)
 - Deploys to **GitHub Pages** with unique URLs per run
-- **History tracking** across runs via GitHub Artifacts
+- **History tracking** across runs (stored on gh-pages branch)
 - **Summary landing page** at the GitHub Pages root listing all report prefixes with stats (powered by `@allurereport/summary`), with deploy-in-progress and new version banners
 - **Job summary table** with pie charts, colored status dots, and report links
 - **Combined summary mode** — aggregate multiple parallel test jobs into one summary table
@@ -21,6 +21,7 @@ Deploy Allure 3 test reports to GitHub Pages with History, Report Aggregation, a
 - **Multi-project** support via `prefix` — multiple test suites on one GitHub Pages site
 - **Concurrent-safe** — parallel workflows can deploy different prefixes simultaneously (5 push retries)
 - **Cache-proof redirects** — prefix redirect pages always resolve the latest report, even when browser-cached
+- **Quality gate** — optionally fail the action on test failures (report is always deployed first)
 
 ## Example 1: Deploy to GitHub Pages
 

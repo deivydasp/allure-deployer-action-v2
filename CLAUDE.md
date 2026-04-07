@@ -53,6 +53,7 @@ The action has two modes controlled by the `mode` input:
 4. **Metadata** — Writes `deploy.json` to the report directory with `runId`, `runAttempt`, `wallClockDuration`, `timestamp` for summary mode and re-run tracking
 5. **Deploy** — Report stats and custom dir copy are done *before* deploy to avoid race conditions with `git reset --hard`. Then `prepareAndCommit` (delete old reports, redirect page, summary page, stage report + history, commit), then push with retry. On push rejection, backup is created lazily (only on first rejection to skip I/O on happy path) for both report and history, then resets to latest remote, restores from backup, re-runs `prepareAndCommit`, and pushes again.
 6. **Notify** — Console, GitHub PR comment, and Actions job summary (skipped when `summary: false`). Includes summary page URL link (with allure logo icon) when `prefix` is set.
+7. **Quality gate** — If `fail_on_test_failure` is `true`, checks for failed/broken tests and calls `setFailed()` with counts and report URL. Runs after deploy and notify so the report is always accessible.
 
 **Summary mode** (`mode: summary`):
 1. **Validate** — Same GitHub Pages validation as deploy mode
