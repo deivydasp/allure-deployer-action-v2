@@ -93,6 +93,12 @@ async function runDeployMode() {
                 ? normalizeUrl(pagesUrl) + (ghPages.deployVersion ? `?v=${ghPages.deployVersion}` : '')
                 : undefined,
         });
+        if (inputs.fail_on_test_failure) {
+            const { failed, broken } = reportStats.statistic;
+            if (failed > 0 || broken > 0) {
+                setFailed(`Test failures detected: ${failed} failed, ${broken} broken. Report: ${reportUrl}`);
+            }
+        }
     }
     catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);

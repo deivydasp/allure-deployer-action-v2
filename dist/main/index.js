@@ -38138,6 +38138,7 @@ const inputs = {
     pr_comment: getBooleanInput('pr_comment'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     prefix: prefix(),
+    fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
     RESULTS_STAGING_PATH: external_node_path_namespaceObject.join(runtimeDir(), 'allure-results'),
     WORKSPACE: workspace(),
@@ -44879,6 +44880,12 @@ async function runDeployMode() {
                 ? normalizeUrl(pagesUrl) + (ghPages.deployVersion ? `?v=${ghPages.deployVersion}` : '')
                 : undefined,
         });
+        if (io.fail_on_test_failure) {
+            const { failed, broken } = reportStats.statistic;
+            if (failed > 0 || broken > 0) {
+                setFailed(`Test failures detected: ${failed} failed, ${broken} broken. Report: ${reportUrl}`);
+            }
+        }
     }
     catch (e) {
         setFailed(`Deployment failed: ${e instanceof Error ? e.message : e}`);

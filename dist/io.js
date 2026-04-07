@@ -28,6 +28,7 @@ const inputs = {
     pr_comment: getBooleanInput('pr_comment'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     prefix: prefix(),
+    fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
     RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
     WORKSPACE: workspace(),

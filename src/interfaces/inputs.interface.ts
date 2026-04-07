@@ -14,6 +14,7 @@ export interface Inputs {
     language?: string;
     keep: number;
     prefix?: string;
+    fail_on_test_failure: boolean;
 }
 export interface DefaultConfig {
     fileProcessingConcurrency: 10;

@@ -169,6 +169,7 @@ The summary job produces one table with all test results, showing "Not deployed"
 | `pr_comment`          | Post report info as a PR comment. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
 | `summary`             | Write a GitHub Actions job summary after deployment. Set to `false` when using a separate summary job. | `true` | No |
 | `prefixes`            | Comma-separated list of prefixes to include in summary mode. If omitted, all prefixes are scanned. | — | No |
+| `fail_on_test_failure`| Fail the action if any tests failed or broken. Report is always deployed first.                | `false`             | No       |
 
 ## Outputs
 

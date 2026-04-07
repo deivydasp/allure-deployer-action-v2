@@ -58,6 +58,9 @@ inputs:
   keep:
     description: "Number of test reports you want to keep alive"
     default: '10'
+  fail_on_test_failure:
+    description: "Fail the action after deployment if any tests failed or broken. Report is always deployed first."
+    default: 'false'
 outputs:
   report_url:
     description: "URL to your test report"
