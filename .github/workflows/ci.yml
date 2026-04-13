@@ -10,6 +10,10 @@ on:
       - 'package.json'
       - 'tsconfig.json'
 
+permissions:
+  contents: write
+  pages: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
