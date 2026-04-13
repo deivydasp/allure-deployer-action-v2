@@ -251,11 +251,10 @@ export class GithubPagesService {
                     continue;
                 reports.push({ dir: path.join(entry.parentPath, entry.name), name: entry.name });
             }
-            // Account for the incoming report (not yet on disk) by keeping one fewer old report
-            if (reports.length >= inputs.keep) {
+            if (reports.length > inputs.keep) {
                 reports.sort((a, b) => Number(a.name) - Number(b.name));
                 const limit = pLimit(10);
-                const toDelete = reports.slice(0, reports.length - inputs.keep + 1);
+                const toDelete = reports.slice(0, reports.length - inputs.keep);
                 await allFulfilledResults(toDelete.map(({ dir }) => limit(async () => {
                     await rm(dir, { recursive: true, force: true });
                     info(`Old Report deleted from '${dir}'`);
