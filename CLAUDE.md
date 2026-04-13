@@ -13,27 +13,25 @@ npm run build          # TypeScript compile + ncc bundle (dist/main/ and dist/cl
 npm run lint           # ESLint on src/
 ```
 
-### Running Tests
+### Testing
 
-After pushing changes, trigger all test workflows and verify they pass:
+A CI workflow (`.github/workflows/ci.yml`) runs automatically on push to master when source or config files change. It:
+1. Validates the build (`tsc --noEmit`) and lint (`eslint`)
+2. Triggers all 9 test workflows (3 at a time via `max-parallel: 3`)
+
+After pushing, verify CI and test results:
 
 ```bash
-# Trigger all test workflows
-gh workflow run "Test: Basic Deploy"
-gh workflow run "Test: Parallel Deploy + Summary"
-gh workflow run "Test: History Tracking"
-gh workflow run "Test: Quality Gate"
-gh workflow run "Test: Custom Prefix"
-gh workflow run "Test: Multi Runner"
-gh workflow run "Test: Keep Limit"
-gh workflow run "Test: No History"
-gh workflow run "Test: Rerun Detection"
+# Check CI status
+gh run list --workflow=ci.yml --limit 1
 
-# Check results (wait ~2 minutes for completion)
-gh run list --limit 10 --json name,status,conclusion --jq '.[] | select(.name != "pages build and deployment") | "\(.conclusion // .status)\t\(.name)"'
+# Check all test results (~2 minutes after push)
+gh run list --limit 12 --json name,status,conclusion --jq '.[] | select(.name != "pages build and deployment" and .name != "CI") | "\(.conclusion // .status)\t\(.name)"'
 ```
 
-All workflows use `workflow_dispatch` and test the action from `./` (current commit). They deploy to the repo's own gh-pages branch using fixtures in `test-fixtures/`. The gh-pages branch must exist with GitHub Pages configured to deploy from it.
+Tests can also be triggered manually: `gh workflow run "Test: Basic Deploy"` etc.
+
+All test workflows use `workflow_dispatch`, test the action from `./` (current commit), and deploy to the repo's own gh-pages branch using fixtures in `test-fixtures/`.
 
 The action runs on **Node 24**. The build produces two ncc bundles:
 - `dist/main/index.js` — main action entry point

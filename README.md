@@ -153,7 +153,7 @@ The summary job produces one table with all test results, showing "Not deployed"
 
 ## Test Workflows
 
-These workflows run on `workflow_dispatch` and validate the action's features end-to-end:
+A [CI workflow](.github/workflows/ci.yml) runs on push to master — validates build/lint then triggers all test workflows automatically. Tests can also be triggered manually via `workflow_dispatch`:
 
 | Test | What it validates |
 |------|-------------------|
