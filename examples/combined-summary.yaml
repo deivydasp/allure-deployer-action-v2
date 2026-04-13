@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Run API tests
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Run E2E tests
@@ -46,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pages: read
     steps:
       - uses: deivydasp/allure-deployer-action@v2
         with:

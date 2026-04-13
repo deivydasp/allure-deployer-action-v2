@@ -3,7 +3,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Run test in multi-module project
@@ -12,4 +12,3 @@ jobs:
         uses: deivydasp/allure-deployer-action@v2
         with:
           allure_results_path: 'allure-results_1,allure-results_2,allure-results_3'
-          show_history: 'true'

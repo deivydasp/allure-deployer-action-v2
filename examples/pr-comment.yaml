@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
+      pages: read
       pull-requests: write
       issues: write
     steps:
@@ -17,4 +17,3 @@ jobs:
         with:
           pr_comment: 'true'
           allure_results_path: 'allure-results'
-          show_history: 'true'
