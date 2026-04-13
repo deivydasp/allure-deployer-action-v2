@@ -13,6 +13,28 @@ npm run build          # TypeScript compile + ncc bundle (dist/main/ and dist/cl
 npm run lint           # ESLint on src/
 ```
 
+### Running Tests
+
+After pushing changes, trigger all test workflows and verify they pass:
+
+```bash
+# Trigger all test workflows
+gh workflow run "Test: Basic Deploy"
+gh workflow run "Test: Parallel Deploy + Summary"
+gh workflow run "Test: History Tracking"
+gh workflow run "Test: Quality Gate"
+gh workflow run "Test: Custom Prefix"
+gh workflow run "Test: Multi Runner"
+gh workflow run "Test: Keep Limit"
+gh workflow run "Test: No History"
+gh workflow run "Test: Rerun Detection"
+
+# Check results (wait ~2 minutes for completion)
+gh run list --limit 10 --json name,status,conclusion --jq '.[] | select(.name != "pages build and deployment") | "\(.conclusion // .status)\t\(.name)"'
+```
+
+All workflows use `workflow_dispatch` and test the action from `./` (current commit). They deploy to the repo's own gh-pages branch using fixtures in `test-fixtures/`. The gh-pages branch must exist with GitHub Pages configured to deploy from it.
+
 The action runs on **Node 24**. The build produces two ncc bundles:
 - `dist/main/index.js` — main action entry point
 - `dist/cleanup/index.js` — post-action cleanup (currently no-op)
