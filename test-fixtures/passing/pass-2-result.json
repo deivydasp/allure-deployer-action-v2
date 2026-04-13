@@ -1,0 +1,15 @@
+{
+  "uuid": "a0000001-0000-0000-0000-000000000002",
+  "historyId": "test-dashboard-load",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "start": 1700000002000,
+  "stop": 1700000003500,
+  "name": "Dashboard loads successfully",
+  "fullName": "dashboard.spec.ts#Dashboard loads successfully",
+  "labels": [
+    { "name": "suite", "value": "Dashboard" },
+    { "name": "severity", "value": "normal" }
+  ]
+}

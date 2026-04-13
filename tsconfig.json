@@ -3,19 +3,17 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "skipLibCheck": true,
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "strict": true,
     "target": "es2022",
-    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "types": ["node"],
     "declaration": false
   },
-  "compileOnSave": true,
   "include": ["src/**/*"],
-  "exclude": ["./test","jest.config.ts"]
+  "exclude": ["./test", "jest.config.ts"]
 }

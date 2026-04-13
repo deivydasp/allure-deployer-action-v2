@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, rmSync, type Dirent } from 'node:fs';
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import simpleGit, { CheckRepoActions, SimpleGit } from 'simple-git';
+import { simpleGit, CheckRepoActions, SimpleGit } from 'simple-git';
 import { context } from '@actions/github';
 import pLimit from 'p-limit';
 import { info, warning } from '@actions/core';
@@ -176,7 +176,7 @@ export class GithubPagesService implements HostingProvider {
                     warning(`Failed to read prefix directory '${entry.name}': ${e}`);
                     return [] as Dirent[];
                 });
-                const runDirs = (runs as Dirent[])
+                const runDirs = runs
                     .filter((r) => r.isDirectory() && /^\d+$/.test(r.name))
                     .sort((a, b) => Number(b.name) - Number(a.name));
 

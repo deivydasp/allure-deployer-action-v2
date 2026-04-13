@@ -1,0 +1,62 @@
+name: "Test: Quality Gate"
+on:
+  workflow_dispatch:
+
+jobs:
+  should-fail:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy with failing tests (should fail action)
+        id: deploy
+        uses: ./
+        continue-on-error: true
+        with:
+          allure_results_path: 'test-fixtures/failing'
+          prefix: 'test-quality-gate'
+          report_name: 'Quality Gate Test'
+          fail_on_test_failure: 'true'
+
+      - name: Verify action failed
+        run: |
+          echo "Deploy outcome: ${{ steps.deploy.outcome }}"
+          if [ "${{ steps.deploy.outcome }}" != "failure" ]; then
+            echo "::error::Expected action to fail but got ${{ steps.deploy.outcome }}"
+            exit 1
+          fi
+          echo "OK: Action failed as expected"
+
+      - name: Verify report was still deployed
+        run: |
+          echo "report_url=${{ steps.deploy.outputs.report_url }}"
+          if [ -z "${{ steps.deploy.outputs.report_url }}" ]; then
+            echo "::error::Report should be deployed even when quality gate fails"
+            exit 1
+          fi
+          echo "OK: Report deployed before failure"
+
+  should-pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy with passing tests (should succeed)
+        id: deploy
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-quality-gate-pass'
+          report_name: 'Quality Gate Pass Test'
+          fail_on_test_failure: 'true'
+
+      - name: Verify action succeeded
+        run: |
+          echo "Deploy outcome: ${{ steps.deploy.outcome }}"
+          echo "OK: Action passed with all tests passing"

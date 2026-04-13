@@ -1,0 +1,15 @@
+{
+  "uuid": "a0000001-0000-0000-0000-000000000003",
+  "historyId": "test-logout",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "start": 1700000003500,
+  "stop": 1700000004000,
+  "name": "User logout",
+  "fullName": "auth.spec.ts#User logout",
+  "labels": [
+    { "name": "suite", "value": "Authentication" },
+    { "name": "severity", "value": "minor" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "uuid": "b0000001-0000-0000-0000-000000000004",
+  "historyId": "test-feature-flag",
+  "status": "skipped",
+  "statusDetails": {
+    "message": "Feature flag 'new-checkout' is disabled"
+  },
+  "stage": "pending",
+  "start": 1700000003500,
+  "stop": 1700000003500,
+  "name": "New checkout flow renders correctly",
+  "fullName": "checkout.spec.ts#New checkout flow renders correctly",
+  "labels": [
+    { "name": "suite", "value": "Checkout" },
+    { "name": "severity", "value": "normal" }
+  ]
+}

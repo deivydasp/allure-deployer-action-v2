@@ -1,0 +1,17 @@
+{
+  "uuid": "b0000001-0000-0000-0000-000000000005",
+  "historyId": "test-flaky-network",
+  "status": "unknown",
+  "statusDetails": {
+    "message": "Test result could not be determined"
+  },
+  "stage": "finished",
+  "start": 1700000003500,
+  "stop": 1700000004000,
+  "name": "Network retry logic handles timeout",
+  "fullName": "network.spec.ts#Network retry logic handles timeout",
+  "labels": [
+    { "name": "suite", "value": "Network" },
+    { "name": "severity", "value": "normal" }
+  ]
+}

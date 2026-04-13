@@ -34,17 +34,12 @@ async function runDeployMode() {
         if (!inputs.allure_results_path) {
             throw new Error("'allure_results_path' is required in deploy mode");
         }
-        if (!inputs.prefix) {
-            warning("'prefix' is not set. The following features are disabled: " +
-                'root summary page, redirect page, rerun tracking, and summary mode support.');
-        }
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
-        // reportDir with prefix == workspace/page-source-path/prefix/run-id
-        // reportDir without a prefix == workspace/page-source-path/run-id
+        // reportDir == workspace/page-source-path/prefix/run-id
         const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
         const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
-        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
+        // History lives on gh-pages at {prefix}/history/history.jsonl
         const historyDir = path.join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
         const historyPath = path.join(historyDir, 'history.jsonl');
         const ghPages = createGitHubPagesService({
@@ -94,9 +89,9 @@ async function runDeployMode() {
                 : undefined,
         });
         if (inputs.fail_on_test_failure) {
-            const { failed, broken } = reportStats.statistic;
-            if (failed > 0 || broken > 0) {
-                setFailed(`Test failures detected: ${failed} failed, ${broken} broken. Report: ${reportUrl}`);
+            const { failed, broken, unknown } = reportStats.statistic;
+            if (failed > 0 || broken > 0 || unknown > 0) {
+                setFailed(`Test failures detected: ${failed} failed, ${broken} broken, ${unknown} unknown. Report: ${reportUrl}`);
             }
         }
     }

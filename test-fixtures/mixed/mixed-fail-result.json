@@ -1,0 +1,18 @@
+{
+  "uuid": "b0000001-0000-0000-0000-000000000002",
+  "historyId": "test-payment-validation",
+  "status": "failed",
+  "statusDetails": {
+    "message": "AssertionError: Expected payment status to be 'completed' but got 'pending'",
+    "trace": "AssertionError: Expected payment status to be 'completed' but got 'pending'\n    at Context.<anonymous> (specs/payment.spec.ts:42:10)"
+  },
+  "stage": "finished",
+  "start": 1700000001000,
+  "stop": 1700000003000,
+  "name": "Validate payment completion status",
+  "fullName": "payment.spec.ts#Validate payment completion status",
+  "labels": [
+    { "name": "suite", "value": "Payments" },
+    { "name": "severity", "value": "critical" }
+  ]
+}

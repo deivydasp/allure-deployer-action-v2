@@ -1,0 +1,51 @@
+name: "Test: Keep Limit"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-three-times:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy #1
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-keep'
+          report_name: 'Keep Limit Test'
+          keep: '2'
+
+      - name: Deploy #2
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-keep'
+          report_name: 'Keep Limit Test'
+          keep: '2'
+
+      - name: Deploy #3
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-keep'
+          report_name: 'Keep Limit Test'
+          keep: '2'
+
+      - name: Verify only 2 reports remain
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          DIRS=$(ls -d test-keep/[0-9]* 2>/dev/null | wc -l)
+          echo "Report directories: $DIRS"
+          if [ "$DIRS" -ne 2 ]; then
+            echo "::error::Expected 2 report dirs (keep=2), got $DIRS"
+            ls -la test-keep/
+            exit 1
+          fi
+          echo "=== Verify history still exists ==="
+          test -f test-keep/history/history.jsonl && echo "OK: history preserved" || { echo "FAIL: history missing"; exit 1; }
+          echo "=== All checks passed ==="

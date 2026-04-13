@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import simpleGit, { CheckRepoActions } from 'simple-git';
+import { simpleGit, CheckRepoActions } from 'simple-git';
 import { context } from '@actions/github';
 import pLimit from 'p-limit';
 import { info, warning } from '@actions/core';

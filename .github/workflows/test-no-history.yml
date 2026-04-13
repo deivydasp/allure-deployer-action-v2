@@ -1,0 +1,44 @@
+name: "Test: No History"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy without history
+        id: deploy
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-no-history'
+          report_name: 'No History Test'
+          show_history: 'false'
+
+      - name: Verify no history directory
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          echo "=== Checking history is absent ==="
+          if [ -d "test-no-history/history" ]; then
+            echo "FAIL: history directory should not exist when show_history=false"
+            ls -la test-no-history/history/
+            exit 1
+          fi
+          echo "OK: No history directory"
+          echo "=== Checking report still deployed ==="
+          REPORT_DIR=$(ls -d test-no-history/[0-9]* 2>/dev/null | head -1)
+          test -n "$REPORT_DIR"              && echo "OK: report dir exists"     || { echo "FAIL: no report dir"; exit 1; }
+          test -f "$REPORT_DIR/index.html"   && echo "OK: report index.html"    || { echo "FAIL: report missing"; exit 1; }
+          echo "=== Verify report_url output ==="
+          if [ -z "${{ steps.deploy.outputs.report_url }}" ]; then
+            echo "::error::report_url output is empty"
+            exit 1
+          fi
+          echo "OK: report_url=${{ steps.deploy.outputs.report_url }}"
+          echo "=== All checks passed ==="

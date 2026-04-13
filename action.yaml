@@ -22,7 +22,8 @@ inputs:
     description: "Comma-separated list of prefixes to include in summary mode. If omitted, all prefix directories on gh-pages are scanned."
     required: false
   prefix:
-    description: "Prefix to uniquely identify test report artifacts when managing multiple projects."
+    description: "Prefix to uniquely identify test report artifacts. Used for summary page, redirect page, rerun tracking, and summary mode."
+    default: 'allure-report'
     required: false
   gh_artifact_prefix:
     description: "Prefix to uniquely identify test report artifacts when managing multiple projects."

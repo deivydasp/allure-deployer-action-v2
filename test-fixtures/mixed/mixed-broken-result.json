@@ -1,0 +1,18 @@
+{
+  "uuid": "b0000001-0000-0000-0000-000000000003",
+  "historyId": "test-db-connection",
+  "status": "broken",
+  "statusDetails": {
+    "message": "TypeError: Cannot read properties of undefined (reading 'connect')",
+    "trace": "TypeError: Cannot read properties of undefined (reading 'connect')\n    at DatabaseService.init (src/db.ts:15:22)\n    at Context.<anonymous> (specs/db.spec.ts:8:5)"
+  },
+  "stage": "finished",
+  "start": 1700000003000,
+  "stop": 1700000003500,
+  "name": "Database connection pool initializes",
+  "fullName": "db.spec.ts#Database connection pool initializes",
+  "labels": [
+    { "name": "suite", "value": "Infrastructure" },
+    { "name": "severity", "value": "critical" }
+  ]
+}

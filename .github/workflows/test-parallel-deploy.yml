@@ -1,0 +1,68 @@
+name: "Test: Parallel Deploy + Summary"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy API Tests
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-api'
+          report_name: 'API Tests'
+          summary: 'false'
+
+  deploy-e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy E2E Tests
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/mixed'
+          prefix: 'test-e2e'
+          report_name: 'E2E Tests'
+          summary: 'false'
+
+  summary:
+    needs: [deploy-api, deploy-e2e]
+    if: '!cancelled()'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Combined Summary
+        uses: ./
+        with:
+          mode: summary
+          prefixes: 'test-api,test-e2e'
+
+  verify:
+    needs: [deploy-api, deploy-e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify both prefixes on gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          echo "=== Checking parallel deploy results ==="
+          test -d test-api                && echo "OK: test-api prefix"   || { echo "FAIL: test-api missing"; exit 1; }
+          test -d test-e2e                && echo "OK: test-e2e prefix"   || { echo "FAIL: test-e2e missing"; exit 1; }
+          test -f test-api/_latest        && echo "OK: test-api _latest"  || { echo "FAIL: test-api _latest missing"; exit 1; }
+          test -f test-e2e/_latest        && echo "OK: test-e2e _latest"  || { echo "FAIL: test-e2e _latest missing"; exit 1; }
+          test -f index.html              && echo "OK: summary page"      || { echo "FAIL: summary page missing"; exit 1; }
+          echo "=== All checks passed ==="

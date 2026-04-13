@@ -1,0 +1,15 @@
+{
+  "uuid": "a0000001-0000-0000-0000-000000000001",
+  "historyId": "test-login-success",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "start": 1700000000000,
+  "stop": 1700000002000,
+  "name": "User login with valid credentials",
+  "fullName": "auth.spec.ts#User login with valid credentials",
+  "labels": [
+    { "name": "suite", "value": "Authentication" },
+    { "name": "severity", "value": "critical" }
+  ]
+}

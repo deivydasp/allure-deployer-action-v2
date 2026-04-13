@@ -1,0 +1,18 @@
+{
+  "uuid": "c0000001-0000-0000-0000-000000000001",
+  "historyId": "test-login-fail",
+  "status": "failed",
+  "statusDetails": {
+    "message": "AssertionError: Expected status 200 but got 401",
+    "trace": "AssertionError: Expected status 200 but got 401\n    at Context.<anonymous> (specs/auth.spec.ts:12:10)"
+  },
+  "stage": "finished",
+  "start": 1700000000000,
+  "stop": 1700000001000,
+  "name": "Login with expired token fails gracefully",
+  "fullName": "auth.spec.ts#Login with expired token fails gracefully",
+  "labels": [
+    { "name": "suite", "value": "Authentication" },
+    { "name": "severity", "value": "critical" }
+  ]
+}

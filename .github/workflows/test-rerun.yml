@@ -1,0 +1,43 @@
+name: "Test: Rerun Detection"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy report (attempt 1)
+        id: first
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/mixed'
+          prefix: 'test-rerun'
+          report_name: 'Rerun Detection Test'
+
+      - name: Verify first deploy
+        run: |
+          echo "First deploy URL: ${{ steps.first.outputs.report_url }}"
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          cat test-rerun/history/history.jsonl | wc -l
+          DEPLOY_JSON=$(ls -d test-rerun/[0-9]*/deploy.json | head -1)
+          echo "deploy.json content:"
+          cat "$DEPLOY_JSON"
+          echo ""
+          echo "=== First deploy OK ==="
+
+      # Note: Actual rerun testing requires re-running this workflow via:
+      #   gh run rerun <run-id>
+      # That will produce runAttempt=2 with the same runId.
+      # The action will then detect the first attempt's deploy.json and
+      # show "Original" + "Rerun #1" columns in the summary table.
+      #
+      # To verify manually:
+      # 1. Run this workflow
+      # 2. After it completes, run: gh run rerun <run-id> --repo deivydasp/allure-deployer-action-v2
+      # 3. Check the job summary — it should show the Rerun #1 column

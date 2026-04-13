@@ -1,0 +1,34 @@
+name: "Test: Custom Prefix"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy with spaces in prefix
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'My Test Suite'
+          report_name: 'Custom Prefix Test'
+
+      - name: Verify prefix normalized to hyphens
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          echo "=== Checking normalized prefix ==="
+          test -d "My-Test-Suite"             && echo "OK: prefix normalized to My-Test-Suite" || { echo "FAIL: normalized prefix dir missing"; exit 1; }
+          test -f "My-Test-Suite/index.html"  && echo "OK: redirect page"                     || { echo "FAIL: redirect missing"; exit 1; }
+          test -f "My-Test-Suite/_latest"     && echo "OK: _latest"                            || { echo "FAIL: _latest missing"; exit 1; }
+          # Ensure spaces version does NOT exist
+          if [ -d "My Test Suite" ]; then
+            echo "FAIL: directory with spaces should not exist"
+            exit 1
+          fi
+          echo "=== All checks passed ==="

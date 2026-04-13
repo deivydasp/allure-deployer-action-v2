@@ -1,2 +1,2 @@
-"use strict";
+export {};
 // No-op post-action cleanup

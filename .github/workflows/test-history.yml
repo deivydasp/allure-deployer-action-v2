@@ -1,0 +1,54 @@
+name: "Test: History Tracking"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-first:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: First deploy
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-history'
+          report_name: 'History Test'
+
+  deploy-second:
+    needs: deploy-first
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Second deploy
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-history'
+          report_name: 'History Test'
+
+      - name: Verify history has 2 entries
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- .
+          LINES=$(wc -l < test-history/history/history.jsonl)
+          echo "History entries: $LINES"
+          if [ "$LINES" -lt 2 ]; then
+            echo "::error::Expected at least 2 history entries, got $LINES"
+            exit 1
+          fi
+          echo "=== History content ==="
+          cat test-history/history/history.jsonl
+          echo "=== Verify 2 report directories ==="
+          DIRS=$(ls -d test-history/[0-9]* | wc -l)
+          echo "Report directories: $DIRS"
+          if [ "$DIRS" -lt 2 ]; then
+            echo "::error::Expected at least 2 report dirs, got $DIRS"
+            exit 1
+          fi
+          echo "=== All checks passed ==="

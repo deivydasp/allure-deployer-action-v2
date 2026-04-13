@@ -1,0 +1,33 @@
+name: "Test: Multi Runner"
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy on ${{ matrix.os }}
+        id: deploy
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-${{ matrix.os }}'
+          report_name: '${{ matrix.os }} Test'
+
+      - name: Verify outputs
+        shell: bash
+        run: |
+          echo "report_url=${{ steps.deploy.outputs.report_url }}"
+          if [ -z "${{ steps.deploy.outputs.report_url }}" ]; then
+            echo "::error::report_url output is empty on ${{ matrix.os }}"
+            exit 1
+          fi
+          echo "OK: Deploy succeeded on ${{ matrix.os }}"

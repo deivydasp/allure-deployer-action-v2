@@ -43942,8 +43942,8 @@ function toError(error) {
 }
 
 // src/esm.mjs
-var simpleGit = (/* unused pure expression or super */ null && (gitInstanceFactory));
-var esm_default = gitInstanceFactory;
+var simpleGit = gitInstanceFactory;
+var esm_default = (/* unused pure expression or super */ null && (gitInstanceFactory));
 
 //# sourceMappingURL=index.js.map
 
@@ -44283,7 +44283,7 @@ class GithubPagesService {
         this.repo = config.repo;
         this.reportDir = config.reportDir;
         this.token = config.token;
-        this.git = esm_default();
+        this.git = simpleGit();
         this.pageUrl = config.pageUrl;
         this.pagesSourcePath = config.pagesSourcePath;
         this.historyPath = config.historyPath;
@@ -44821,17 +44821,12 @@ async function runDeployMode() {
         if (!io.allure_results_path) {
             throw new Error("'allure_results_path' is required in deploy mode");
         }
-        if (!io.prefix) {
-            warning("'prefix' is not set. The following features are disabled: " +
-                'root summary page, redirect page, rerun tracking, and summary mode support.');
-        }
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
-        // reportDir with prefix == workspace/page-source-path/prefix/run-id
-        // reportDir without a prefix == workspace/page-source-path/run-id
+        // reportDir == workspace/page-source-path/prefix/run-id
         const reportSubDir = external_node_path_namespaceObject.join(pagesSourcePath, io.prefix ?? '', Date.now().toString());
         const reportDir = external_node_path_namespaceObject.join(io.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
-        // History lives on gh-pages at {prefix}/history/history.jsonl (or history/history.jsonl without prefix)
+        // History lives on gh-pages at {prefix}/history/history.jsonl
         const historyDir = external_node_path_namespaceObject.join(io.WORKSPACE, pagesSourcePath, io.prefix ?? '', 'history');
         const historyPath = external_node_path_namespaceObject.join(historyDir, 'history.jsonl');
         const ghPages = createGitHubPagesService({
@@ -44881,9 +44876,9 @@ async function runDeployMode() {
                 : undefined,
         });
         if (io.fail_on_test_failure) {
-            const { failed, broken } = reportStats.statistic;
-            if (failed > 0 || broken > 0) {
-                setFailed(`Test failures detected: ${failed} failed, ${broken} broken. Report: ${reportUrl}`);
+            const { failed, broken, unknown } = reportStats.statistic;
+            if (failed > 0 || broken > 0 || unknown > 0) {
+                setFailed(`Test failures detected: ${failed} failed, ${broken} broken, ${unknown} unknown. Report: ${reportUrl}`);
             }
         }
     }

@@ -1,0 +1,15 @@
+{
+  "uuid": "b0000001-0000-0000-0000-000000000001",
+  "historyId": "test-api-health",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "start": 1700000000000,
+  "stop": 1700000001000,
+  "name": "API health check returns 200",
+  "fullName": "api.spec.ts#API health check returns 200",
+  "labels": [
+    { "name": "suite", "value": "API" },
+    { "name": "severity", "value": "blocker" }
+  ]
+}
