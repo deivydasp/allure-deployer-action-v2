@@ -1,0 +1,19 @@
+name: "Test: Rerun Detection (trigger rerun)"
+on:
+  workflow_run:
+    workflows: ["Test: Rerun Detection"]
+    types: [completed]
+
+jobs:
+  rerun:
+    # Only rerun on first attempt (avoid infinite loop)
+    if: github.event.workflow_run.run_attempt == 1 && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Rerun the completed workflow
+        run: |
+          gh run rerun ${{ github.event.workflow_run.id }} --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}

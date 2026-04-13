@@ -2,10 +2,9 @@ name: "Test: Rerun Detection"
 on:
   workflow_dispatch:
 
-# This test requires two manual steps:
-# 1. Trigger this workflow: gh workflow run "Test: Rerun Detection"
-# 2. After it completes, rerun it: gh run rerun <run-id>
-# Attempt 2 automatically verifies that rerun detection works.
+# Attempt 1 deploys the report. A companion workflow (test-rerun-trigger.yml)
+# automatically reruns this workflow on completion. Attempt 2 verifies that
+# both attempts are detected via deploy.json metadata.
 
 jobs:
   deploy:
