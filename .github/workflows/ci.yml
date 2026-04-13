@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'dist/**'
+      - 'action.yaml'
+      - 'package.json'
+      - 'tsconfig.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+
+  trigger-tests:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    strategy:
+      matrix:
+        workflow:
+          - test-basic-deploy.yml
+          - test-parallel-deploy.yml
+          - test-history.yml
+          - test-quality-gate.yml
+          - test-custom-prefix.yml
+          - test-multi-runner.yml
+          - test-keep-limit.yml
+          - test-no-history.yml
+          - test-rerun.yml
+    steps:
+      - name: Trigger ${{ matrix.workflow }}
+        run: gh workflow run "${{ matrix.workflow }}" --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
