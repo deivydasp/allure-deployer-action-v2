@@ -22,26 +22,37 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
 
-  trigger-tests:
+  # Group 1: independent fast tests
+  test-basic:
     needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    strategy:
-      max-parallel: 2
-      matrix:
-        workflow:
-          - test-basic-deploy.yml
-          - test-parallel-deploy.yml
-          - test-history.yml
-          - test-quality-gate.yml
-          - test-custom-prefix.yml
-          - test-multi-runner.yml
-          - test-keep-limit.yml
-          - test-no-history.yml
-          - test-rerun.yml
-    steps:
-      - name: Trigger ${{ matrix.workflow }}
-        run: gh workflow run "${{ matrix.workflow }}" --repo ${{ github.repository }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+    uses: ./.github/workflows/test-basic-deploy.yml
+  test-quality-gate:
+    needs: build
+    uses: ./.github/workflows/test-quality-gate.yml
+  test-custom-prefix:
+    needs: build
+    uses: ./.github/workflows/test-custom-prefix.yml
+  test-no-history:
+    needs: build
+    uses: ./.github/workflows/test-no-history.yml
+
+  # Group 2: after group 1 completes (reduces push contention)
+  test-history:
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    uses: ./.github/workflows/test-history.yml
+  test-keep-limit:
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    uses: ./.github/workflows/test-keep-limit.yml
+
+  # Group 3: slower tests run last
+  test-parallel:
+    needs: [test-history, test-keep-limit]
+    uses: ./.github/workflows/test-parallel-deploy.yml
+  test-multi-runner:
+    needs: [test-history, test-keep-limit]
+    uses: ./.github/workflows/test-multi-runner.yml
+
+  # Rerun test: runs alone (triggers a rerun via companion workflow)
+  test-rerun:
+    needs: [test-parallel, test-multi-runner]
+    uses: ./.github/workflows/test-rerun.yml

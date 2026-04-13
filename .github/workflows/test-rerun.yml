@@ -1,17 +1,19 @@
 name: "Test: Rerun Detection"
 on:
   workflow_dispatch:
+  workflow_call:
 
 # Attempt 1 deploys the report. A companion workflow (test-rerun-trigger.yml)
 # automatically reruns this workflow on completion. Attempt 2 verifies that
 # both attempts are detected via deploy.json metadata.
 
+permissions:
+  contents: write
+  pages: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
 
@@ -32,8 +34,6 @@ jobs:
     if: github.run_attempt > 1
     needs: deploy
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v6
       - name: Verify rerun detection

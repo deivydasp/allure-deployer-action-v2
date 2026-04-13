@@ -1,13 +1,15 @@
 name: "Test: Parallel Deploy + Summary"
 on:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+  pages: read
 
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Deploy API Tests
@@ -20,9 +22,6 @@ jobs:
 
   deploy-e2e:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Deploy E2E Tests
@@ -37,9 +36,6 @@ jobs:
     needs: [deploy-api, deploy-e2e]
     if: '!cancelled()'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Combined Summary
@@ -51,8 +47,6 @@ jobs:
   verify:
     needs: [deploy-api, deploy-e2e]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v6
       - name: Verify both prefixes on gh-pages

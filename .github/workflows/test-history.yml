@@ -1,13 +1,15 @@
 name: "Test: History Tracking"
 on:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+  pages: read
 
 jobs:
   deploy-first:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: First deploy
@@ -20,9 +22,6 @@ jobs:
   deploy-second:
     needs: deploy-first
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Second deploy

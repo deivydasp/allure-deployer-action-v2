@@ -1,13 +1,15 @@
 name: "Test: Custom Prefix"
 on:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+  pages: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
 

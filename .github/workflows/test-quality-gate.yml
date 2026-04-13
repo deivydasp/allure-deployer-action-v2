@@ -1,13 +1,15 @@
 name: "Test: Quality Gate"
 on:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+  pages: read
 
 jobs:
   should-fail:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
 
@@ -41,9 +43,6 @@ jobs:
 
   should-pass:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: read
     steps:
       - uses: actions/checkout@v6
 
