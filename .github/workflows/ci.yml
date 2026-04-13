@@ -27,6 +27,7 @@ jobs:
     permissions:
       actions: write
     strategy:
+      max-parallel: 3
       matrix:
         workflow:
           - test-basic-deploy.yml

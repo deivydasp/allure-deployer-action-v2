@@ -8,36 +8,62 @@ jobs:
     permissions:
       contents: write
       pages: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
 
-      - name: Deploy report (attempt 1)
-        id: first
+      - name: Deploy report (attempt ${{ github.run_attempt }})
+        id: deploy
         uses: ./
         with:
           allure_results_path: 'test-fixtures/mixed'
           prefix: 'test-rerun'
           report_name: 'Rerun Detection Test'
 
-      - name: Verify first deploy
+      - name: Verify deploy
         run: |
-          echo "First deploy URL: ${{ steps.first.outputs.report_url }}"
+          echo "Attempt: ${{ github.run_attempt }}"
+          echo "Report URL: ${{ steps.deploy.outputs.report_url }}"
+
+      # On first attempt, trigger a rerun to test rerun detection
+      - name: Trigger rerun
+        if: github.run_attempt == 1
+        run: gh run rerun ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # On second attempt, verify rerun was detected
+      - name: Verify rerun detection (attempt 2+)
+        if: github.run_attempt > 1
+        run: |
           git fetch origin gh-pages --depth=1
           git checkout origin/gh-pages -- .
-          cat test-rerun/history/history.jsonl | wc -l
-          DEPLOY_JSON=$(ls -d test-rerun/[0-9]*/deploy.json | head -1)
-          echo "deploy.json content:"
-          cat "$DEPLOY_JSON"
-          echo ""
-          echo "=== First deploy OK ==="
-
-      # Note: Actual rerun testing requires re-running this workflow via:
-      #   gh run rerun <run-id>
-      # That will produce runAttempt=2 with the same runId.
-      # The action will then detect the first attempt's deploy.json and
-      # show "Original" + "Rerun #1" columns in the summary table.
-      #
-      # To verify manually:
-      # 1. Run this workflow
-      # 2. After it completes, run: gh run rerun <run-id> --repo deivydasp/allure-deployer-action-v2
-      # 3. Check the job summary — it should show the Rerun #1 column
+          echo "=== Deploy metadata ==="
+          RUN_ID=${{ github.run_id }}
+          MATCHING=0
+          ATTEMPTS=""
+          for f in test-rerun/[0-9]*/deploy.json; do
+            content=$(cat "$f")
+            echo "$f: $content"
+            file_run_id=$(echo "$content" | node -e "process.stdin.on('data',d=>{const j=JSON.parse(d);process.stdout.write(String(j.runId))})")
+            file_attempt=$(echo "$content" | node -e "process.stdin.on('data',d=>{const j=JSON.parse(d);process.stdout.write(String(j.runAttempt))})")
+            if [ "$file_run_id" = "$RUN_ID" ]; then
+              MATCHING=$((MATCHING + 1))
+              ATTEMPTS="$ATTEMPTS $file_attempt"
+            fi
+          done
+          echo "Matching deploys for runId $RUN_ID: $MATCHING (attempts:$ATTEMPTS)"
+          if [ "$MATCHING" -lt 2 ]; then
+            echo "::error::Expected at least 2 deploys with same runId, got $MATCHING"
+            exit 1
+          fi
+          # Verify we have both attempt 1 and attempt 2
+          if ! echo "$ATTEMPTS" | grep -q "1"; then
+            echo "::error::Missing runAttempt=1"
+            exit 1
+          fi
+          if ! echo "$ATTEMPTS" | grep -q "2"; then
+            echo "::error::Missing runAttempt=2"
+            exit 1
+          fi
+          echo "=== Rerun detection verified: attempts$ATTEMPTS ==="
