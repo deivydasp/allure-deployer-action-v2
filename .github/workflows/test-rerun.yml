@@ -8,7 +8,6 @@ jobs:
     permissions:
       contents: write
       pages: read
-      actions: write
     steps:
       - uses: actions/checkout@v6
 
@@ -25,16 +24,16 @@ jobs:
           echo "Attempt: ${{ github.run_attempt }}"
           echo "Report URL: ${{ steps.deploy.outputs.report_url }}"
 
-      # On first attempt, trigger a rerun to test rerun detection
-      - name: Trigger rerun
-        if: github.run_attempt == 1
-        run: gh run rerun ${{ github.run_id }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # On second attempt, verify rerun was detected
-      - name: Verify rerun detection (attempt 2+)
-        if: github.run_attempt > 1
+  # On attempt 2+, verify rerun was detected
+  verify-rerun:
+    if: github.run_attempt > 1
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify rerun detection
         run: |
           git fetch origin gh-pages --depth=1
           git checkout origin/gh-pages -- .
@@ -57,7 +56,6 @@ jobs:
             echo "::error::Expected at least 2 deploys with same runId, got $MATCHING"
             exit 1
           fi
-          # Verify we have both attempt 1 and attempt 2
           if ! echo "$ATTEMPTS" | grep -q "1"; then
             echo "::error::Missing runAttempt=1"
             exit 1
@@ -67,3 +65,19 @@ jobs:
             exit 1
           fi
           echo "=== Rerun detection verified: attempts$ATTEMPTS ==="
+
+  # On attempt 1, trigger a rerun after all jobs complete
+  trigger-rerun:
+    if: github.run_attempt == 1
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger rerun
+        run: |
+          # Wait briefly for the run to fully complete before rerunning
+          sleep 5
+          gh run rerun ${{ github.run_id }} --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
