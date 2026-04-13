@@ -1,9 +1,27 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm view:*)",
-      "Bash(npm run:*)",
-      "Bash(npm install:*)"
+      "Bash(npm *)",
+      "Bash(npx tsc *)",
+      "Bash(npx tsc:*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git fetch*)",
+      "Bash(git checkout*)",
+      "Bash(git branch*)",
+      "Bash(gh *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(start *)",
+      "Bash(cd *)",
+      "Bash(unzip *)",
+      "Bash(touch *)",
+      "Bash(node *)",
+      "WebFetch(domain:allurereport.org)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:typescript-eslint.io)"
     ]
   }
 }
