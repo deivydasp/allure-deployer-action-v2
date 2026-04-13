@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   pages: read
+  actions: write
 
 jobs:
   build:
@@ -56,7 +57,17 @@ jobs:
     needs: [test-history, test-keep-limit]
     uses: ./.github/workflows/test-multi-runner.yml
 
-  # Rerun test: runs alone (triggers a rerun via companion workflow)
-  test-rerun:
+  # Dispatch rerun test as a standalone run (fire-and-forget).
+  # test-rerun-trigger.yml auto-reruns it for full attempt 2 verification.
+  dispatch-rerun-test:
     needs: [test-parallel, test-multi-runner]
-    uses: ./.github/workflows/test-rerun.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch rerun test
+        run: |
+          gh workflow run "test-rerun.yml" \
+            --repo "${{ github.repository }}" \
+            -f notify_sha="${{ github.sha }}" \
+            -f notify_repo="${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -2,7 +2,7 @@ import { endGroup, error, info, setFailed, startGroup, warning } from '@actions/
 import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import normalizeUrl from 'normalize-url';
 import inputs from './io.js';
@@ -181,6 +181,8 @@ function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, page
 }
 async function stageDeployment({ host, RESULTS_PATHS, }) {
     info('Staging files...');
+    // Clean staging directory from any previous run in the same job
+    await rm(inputs.RESULTS_STAGING_PATH, { recursive: true, force: true });
     // host.init (git clone) and copyFiles run concurrently.
     // After clone, history is already available on disk at {prefix}/history/history.jsonl.
     const [result] = await Promise.all([

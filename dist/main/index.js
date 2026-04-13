@@ -44966,6 +44966,8 @@ function createGitHubPagesService({ token, owner, repo, reportDir, pageUrl, page
 }
 async function stageDeployment({ host, RESULTS_PATHS, }) {
     info('Staging files...');
+    // Clean staging directory from any previous run in the same job
+    await (0,promises_namespaceObject.rm)(io.RESULTS_STAGING_PATH, { recursive: true, force: true });
     // host.init (git clone) and copyFiles run concurrently.
     // After clone, history is already available on disk at {prefix}/history/history.jsonl.
     const [result] = await Promise.all([

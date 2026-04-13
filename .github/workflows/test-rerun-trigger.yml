@@ -13,7 +13,6 @@ jobs:
       actions: write
     steps:
       - name: Rerun the completed workflow
-        run: |
-          gh run rerun ${{ github.event.workflow_run.id }} --repo ${{ github.repository }}
+        run: gh run rerun ${{ github.event.workflow_run.id }} --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ github.token }}
