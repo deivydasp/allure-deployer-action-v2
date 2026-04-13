@@ -142,15 +142,6 @@ jobs:
 
 The summary job produces one table with all test results, showing "Not deployed" for any cancelled/skipped jobs.
 
-## More examples
-
-- [Deploy to GitHub Pages](examples/deploy-github-pages.yaml)
-- [Aggregate multiple Allure results](examples/aggregate-report.yaml)
-- [Deploy to another GitHub repository](examples/deploy-external-repo.yaml)
-- [Multi-project setup with prefix](examples/multi-projects-gh-pages.yaml)
-- [PR comment with report link](examples/pr-comment.yaml)
-- [Combined summary for parallel jobs](examples/combined-summary.yaml)
-
 ## Test Workflows
 
 A [CI workflow](.github/workflows/ci.yml) runs on push to master — validates build/lint then triggers all test workflows automatically. Tests can also be triggered manually via `workflow_dispatch`:
