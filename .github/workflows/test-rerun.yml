@@ -66,7 +66,7 @@ jobs:
           fi
           echo "=== Rerun detection verified: attempts$ATTEMPTS ==="
 
-  # On attempt 1, trigger a rerun after all jobs complete
+  # On attempt 1, queue a rerun via REST API (queued for after this run completes)
   trigger-rerun:
     if: github.run_attempt == 1
     needs: deploy
@@ -74,10 +74,9 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Trigger rerun
+      - name: Queue rerun via API
         run: |
-          # Wait briefly for the run to fully complete before rerunning
-          sleep 5
-          gh run rerun ${{ github.run_id }} --repo ${{ github.repository }}
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/rerun \
+            --method POST
         env:
           GH_TOKEN: ${{ github.token }}
