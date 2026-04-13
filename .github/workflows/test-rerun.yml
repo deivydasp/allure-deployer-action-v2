@@ -2,6 +2,11 @@ name: "Test: Rerun Detection"
 on:
   workflow_dispatch:
 
+# This test requires two manual steps:
+# 1. Trigger this workflow: gh workflow run "Test: Rerun Detection"
+# 2. After it completes, rerun it: gh run rerun <run-id>
+# Attempt 2 automatically verifies that rerun detection works.
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -24,7 +29,6 @@ jobs:
           echo "Attempt: ${{ github.run_attempt }}"
           echo "Report URL: ${{ steps.deploy.outputs.report_url }}"
 
-  # On attempt 2+, verify rerun was detected
   verify-rerun:
     if: github.run_attempt > 1
     needs: deploy
@@ -65,18 +69,3 @@ jobs:
             exit 1
           fi
           echo "=== Rerun detection verified: attempts$ATTEMPTS ==="
-
-  # On attempt 1, queue a rerun via REST API (queued for after this run completes)
-  trigger-rerun:
-    if: github.run_attempt == 1
-    needs: deploy
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Queue rerun via API
-        run: |
-          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/rerun \
-            --method POST
-        env:
-          GH_TOKEN: ${{ github.token }}
