@@ -151,6 +151,22 @@ The summary job produces one table with all test results, showing "Not deployed"
 - [PR comment with report link](examples/pr-comment.yaml)
 - [Combined summary for parallel jobs](examples/combined-summary.yaml)
 
+## Test Workflows
+
+These workflows run on `workflow_dispatch` and validate the action's features end-to-end:
+
+| Test | What it validates |
+|------|-------------------|
+| [Basic Deploy](.github/workflows/test-basic-deploy.yml) | Core deploy flow — outputs, gh-pages content, history, redirect, summary page |
+| [Parallel Deploy + Summary](.github/workflows/test-parallel-deploy.yml) | Concurrent prefixes + `mode: summary` aggregation |
+| [History Tracking](.github/workflows/test-history.yml) | History accumulates across sequential deploys |
+| [Quality Gate](.github/workflows/test-quality-gate.yml) | `fail_on_test_failure` — fails on failures, passes on clean results |
+| [Custom Prefix](.github/workflows/test-custom-prefix.yml) | Spaces in prefix normalized to hyphens |
+| [Multi Runner](.github/workflows/test-multi-runner.yml) | Deploys on ubuntu, macos, and windows |
+| [Keep Limit](.github/workflows/test-keep-limit.yml) | Old reports cleaned up when exceeding `keep` |
+| [No History](.github/workflows/test-no-history.yml) | `show_history: false` skips history creation |
+| [Rerun Detection](.github/workflows/test-rerun.yml) | Deploy for manual `gh run rerun` testing |
+
 
 ## Configuration Options (Inputs)
 
