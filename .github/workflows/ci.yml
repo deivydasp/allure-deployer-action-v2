@@ -5,10 +5,12 @@ on:
     branches: [master]
     paths:
       - 'src/**'
+      - '__tests__/**'
       - 'dist/**'
       - 'action.yaml'
       - 'package.json'
       - 'tsconfig.json'
+      - 'vitest.config.ts'
 
 permissions:
   contents: write
@@ -23,6 +25,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
+      - run: npm test
       - run: npx tsc --noEmit
       - run: npm run lint
 

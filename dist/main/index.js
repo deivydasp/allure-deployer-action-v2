@@ -38140,7 +38140,7 @@ const inputs = {
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
-    RESULTS_STAGING_PATH: external_node_path_namespaceObject.join(runtimeDir(), 'allure-results'),
+    RESULTS_STAGING_PATH: (0,external_node_path_namespaceObject.join)(runtimeDir(), 'allure-results'),
     WORKSPACE: workspace(),
 };
 if (inputs.github_token)
@@ -38156,10 +38156,10 @@ function prefix() {
     return prefix ? replaceWhiteSpace(prefix) : undefined;
 }
 function workspace() {
-    return external_node_path_namespaceObject.join(runtimeDir(), 'report');
+    return (0,external_node_path_namespaceObject.join)(runtimeDir(), 'report');
 }
 function runtimeDir() {
-    return external_node_path_namespaceObject.join(external_node_os_namespaceObject.tmpdir(), 'allure-report-deployer');
+    return (0,external_node_path_namespaceObject.join)(external_node_os_namespaceObject.tmpdir(), 'allure-report-deployer');
 }
 /* harmony default export */ const io = (inputs);
 
@@ -38283,7 +38283,7 @@ class GitHubNotifier {
             },
         ]);
         const message = data.summaryPageUrl
-            ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" align="absmiddle" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
+            ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" style="vertical-align: middle" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
             : table;
         const promises = [];
         if (data.reportUrl) {
@@ -38946,8 +38946,8 @@ function resolveAllureCli() {
     if (allureCliPath)
         return allureCliPath;
     const require = (0,external_node_module_namespaceObject.createRequire)(import.meta.url);
-    const allurePkgDir = external_node_path_namespaceObject.dirname(require.resolve('allure'));
-    const resolved = external_node_path_namespaceObject.resolve(allurePkgDir, '..', 'cli.js');
+    const allurePkgDir = (0,external_node_path_namespaceObject.dirname)(require.resolve('allure'));
+    const resolved = (0,external_node_path_namespaceObject.resolve)(allurePkgDir, '..', 'cli.js');
     if (!(0,external_node_fs_namespaceObject.existsSync)(resolved)) {
         throw new Error(`Allure CLI not found at ${resolved}. The allure package structure may have changed.`);
     }
@@ -39009,7 +39009,7 @@ class Allure {
     readEnvironments() {
         try {
             const properties = propertiesReader({
-                sourceFile: external_node_path_namespaceObject.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
+                sourceFile: (0,external_node_path_namespaceObject.join)(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
             const map = new Map();
             info('Environments');
@@ -39028,8 +39028,8 @@ class Allure {
     }
     async generate(executor) {
         if (executor) {
-            const executorPath = external_node_path_namespaceObject.join(this.config.RESULTS_STAGING_PATH, 'executor.json');
-            await promises_namespaceObject.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
+            const executorPath = (0,external_node_path_namespaceObject.join)(this.config.RESULTS_STAGING_PATH, 'executor.json');
+            await (0,promises_namespaceObject.writeFile)(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
         const configPath = await this.writeAllureConfig();
         const command = [
@@ -39071,8 +39071,8 @@ class Allure {
             allurerc.historyPath = this.config.HISTORY_PATH;
             allurerc.historyLimit = this.config.historyLimit;
         }
-        const configPath = external_node_path_namespaceObject.join(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
-        await promises_namespaceObject.writeFile(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
+        const configPath = (0,external_node_path_namespaceObject.join)(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
+        await (0,promises_namespaceObject.writeFile)(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
         return configPath;
     }
     /**
@@ -39080,7 +39080,7 @@ class Allure {
      */
     async postProcessHistory(reportUrl) {
         try {
-            const content = await promises_namespaceObject.readFile(this.config.HISTORY_PATH, 'utf8');
+            const content = await (0,promises_namespaceObject.readFile)(this.config.HISTORY_PATH, 'utf8');
             const trimmed = content.trimEnd();
             if (!trimmed)
                 return;
@@ -39093,7 +39093,7 @@ class Allure {
             if (lines.length > this.config.historyLimit) {
                 lines = lines.slice(-this.config.historyLimit);
             }
-            await promises_namespaceObject.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
+            await (0,promises_namespaceObject.writeFile)(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
         }
         catch (e) {
             warning(`Failed to post-process history: ${e}`);
@@ -39108,19 +39108,19 @@ class Allure {
      */
     async createHistoryRedirect() {
         try {
-            const awesomeDir = external_node_path_namespaceObject.join(this.config.REPORTS_DIR, 'awesome');
+            const awesomeDir = (0,external_node_path_namespaceObject.join)(this.config.REPORTS_DIR, 'awesome');
             try {
-                const stat = await promises_namespaceObject.stat(awesomeDir);
-                if (stat.isDirectory())
+                const dirStat = await (0,promises_namespaceObject.stat)(awesomeDir);
+                if (dirStat.isDirectory())
                     return; // multi-plugin mode — awesome/ is a real plugin output
             }
             catch {
                 // doesn't exist — create the redirect
             }
-            await promises_namespaceObject.mkdir(awesomeDir, { recursive: true });
+            await (0,promises_namespaceObject.mkdir)(awesomeDir, { recursive: true });
             const html = `<!DOCTYPE html>
 <html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
-            await promises_namespaceObject.writeFile(external_node_path_namespaceObject.join(awesomeDir, 'index.html'), html, 'utf8');
+            await (0,promises_namespaceObject.writeFile)((0,external_node_path_namespaceObject.join)(awesomeDir, 'index.html'), html, 'utf8');
         }
         catch (e) {
             warning(`Failed to create history redirect: ${e}`);
@@ -44235,7 +44235,7 @@ async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
     throw new Error('Unreachable: withRetry loop completed without return or throw');
 }
 async function copyDirectory(sourceDir, destDir) {
-    await promises_namespaceObject.cp(sourceDir, destDir, { recursive: true });
+    await (0,promises_namespaceObject.cp)(sourceDir, destDir, { recursive: true });
     info(`Copied directory from ${sourceDir} to ${destDir}`);
 }
 async function allFulfilledResults(promises) {
@@ -44311,7 +44311,7 @@ class GithubPagesService {
         // Running sequentially to avoid git lock issues
         await this.deleteOldReports();
         // Disable Jekyll processing so files like _version are served correctly
-        const nojekyllPath = external_node_path_namespaceObject.join(io.WORKSPACE, this.pagesSourcePath, '.nojekyll');
+        const nojekyllPath = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, this.pagesSourcePath, '.nojekyll');
         if (!(0,external_node_fs_namespaceObject.existsSync)(nojekyllPath)) {
             await (0,promises_namespaceObject.writeFile)(nojekyllPath, '', 'utf8');
             await this.git.add(nojekyllPath);
@@ -44320,7 +44320,7 @@ class GithubPagesService {
             await this.createRedirectPage(this.pageUrl);
             await this.createRootSummaryPage();
         }
-        if (!(0,external_node_fs_namespaceObject.existsSync)(external_node_path_namespaceObject.join(this.reportDir, 'index.html'))) {
+        if (!(0,external_node_fs_namespaceObject.existsSync)((0,external_node_path_namespaceObject.join)(this.reportDir, 'index.html'))) {
             throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
         }
         await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
@@ -44363,15 +44363,15 @@ class GithubPagesService {
      *  with cache-busting, so even a browser-cached page always finds the current report. */
     async createRedirectPage(redirectUrl) {
         const targetUrl = normalizeUrl(`${redirectUrl}/index.html`);
-        const prefixDir = external_node_path_namespaceObject.join(io.WORKSPACE, this.pagesSourcePath, io.prefix ?? '');
+        const prefixDir = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, this.pagesSourcePath, io.prefix ?? '');
         // Write target URL to _latest (fetched dynamically by the redirect page)
-        const latestPath = external_node_path_namespaceObject.join(prefixDir, '_latest');
+        const latestPath = (0,external_node_path_namespaceObject.join)(prefixDir, '_latest');
         await (0,promises_namespaceObject.writeFile)(latestPath, targetUrl, 'utf8');
         await this.git.add(latestPath);
         // Redirect page fetches _latest with cache-busting to always get the current target
         const htmlContent = `<!DOCTYPE html>
 <html><head><script>fetch("_latest?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(u){window.location.replace(u.trim())}).catch(function(){document.body.textContent="Failed to load report. Please refresh."});</script></head><body></body></html>`;
-        const filePath = external_node_path_namespaceObject.join(prefixDir, 'index.html');
+        const filePath = (0,external_node_path_namespaceObject.join)(prefixDir, 'index.html');
         await (0,promises_namespaceObject.writeFile)(filePath, htmlContent);
         await this.git.add(filePath);
         info(`Redirect 'index.html' created at ${external_node_path_namespaceObject.posix.join(this.pagesSourcePath || '/', io.prefix ?? '')}`);
@@ -44379,13 +44379,13 @@ class GithubPagesService {
     /** Creates a root index.html summary page using allure's built-in summary generator */
     async createRootSummaryPage() {
         try {
-            const rootDir = external_node_path_namespaceObject.join(io.WORKSPACE, this.pagesSourcePath);
+            const rootDir = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, this.pagesSourcePath);
             const entries = await (0,promises_namespaceObject.readdir)(rootDir, { withFileTypes: true });
             const summaries = [];
             for (const entry of entries) {
                 if (!entry.isDirectory())
                     continue;
-                const prefixDir = external_node_path_namespaceObject.join(rootDir, entry.name);
+                const prefixDir = (0,external_node_path_namespaceObject.join)(rootDir, entry.name);
                 // Only include prefixes that have numeric run subdirs (deployed reports)
                 const runs = await (0,promises_namespaceObject.readdir)(prefixDir, { withFileTypes: true }).catch((e) => {
                     warning(`Failed to read prefix directory '${entry.name}': ${e}`);
@@ -44396,10 +44396,10 @@ class GithubPagesService {
                     .sort((a, b) => Number(b.name) - Number(a.name));
                 if (runDirs.length === 0)
                     continue;
-                const latestDir = external_node_path_namespaceObject.join(prefixDir, runDirs[0].name);
+                const latestDir = (0,external_node_path_namespaceObject.join)(prefixDir, runDirs[0].name);
                 try {
                     for (const candidate of ['summary.json', 'awesome/summary.json']) {
-                        const summaryPath = external_node_path_namespaceObject.join(latestDir, candidate);
+                        const summaryPath = (0,external_node_path_namespaceObject.join)(latestDir, candidate);
                         if ((0,external_node_fs_namespaceObject.existsSync)(summaryPath)) {
                             const summary = JSON.parse(await (0,promises_namespaceObject.readFile)(summaryPath, 'utf8'));
                             // Normalize Allure v2 format (statistic) to v3 format (stats)
@@ -44434,7 +44434,7 @@ class GithubPagesService {
             }
             await generateSummary(rootDir, summaries);
             await this.injectDeployBanner(rootDir);
-            await this.git.add(external_node_path_namespaceObject.join(rootDir, 'index.html'));
+            await this.git.add((0,external_node_path_namespaceObject.join)(rootDir, 'index.html'));
             info('Root summary page created');
         }
         catch (e) {
@@ -44456,10 +44456,10 @@ class GithubPagesService {
     async injectDeployBanner(rootDir) {
         const version = Date.now().toString();
         this.deployVersion = version;
-        const versionPath = external_node_path_namespaceObject.join(rootDir, '_version');
+        const versionPath = (0,external_node_path_namespaceObject.join)(rootDir, '_version');
         await (0,promises_namespaceObject.writeFile)(versionPath, version, 'utf8');
         await this.git.add(versionPath);
-        const indexPath = external_node_path_namespaceObject.join(rootDir, 'index.html');
+        const indexPath = (0,external_node_path_namespaceObject.join)(rootDir, 'index.html');
         let html = await (0,promises_namespaceObject.readFile)(indexPath, 'utf8');
         const script = [
             '<script>document.addEventListener("DOMContentLoaded",function(){',
@@ -44499,14 +44499,14 @@ class GithubPagesService {
     /** Deletes old Allure reports, keeping the latest `inputs.keep` */
     async deleteOldReports() {
         try {
-            const parentDir = external_node_path_namespaceObject.dirname(this.reportDir);
+            const parentDir = (0,external_node_path_namespaceObject.dirname)(this.reportDir);
             const entries = await (0,promises_namespaceObject.readdir)(parentDir, { withFileTypes: true });
             // Single pass: filter report directories (name is a Date.now() timestamp)
             const reports = [];
             for (const entry of entries) {
                 if (!entry.isDirectory() || !/^\d+$/.test(entry.name))
                     continue;
-                reports.push({ dir: external_node_path_namespaceObject.join(entry.parentPath, entry.name), name: entry.name });
+                reports.push({ dir: (0,external_node_path_namespaceObject.join)(entry.parentPath, entry.name), name: entry.name });
             }
             if (reports.length > io.keep) {
                 reports.sort((a, b) => Number(a.name) - Number(b.name));
@@ -44541,8 +44541,8 @@ class GithubPagesService {
     /** Handles Git push with retry logic specifically for concurrent push scenarios */
     async gitPushWithRetry() {
         // Backup created lazily on first push rejection — avoids unnecessary I/O on happy path
-        const backupDir = external_node_path_namespaceObject.join(external_node_path_namespaceObject.dirname(io.WORKSPACE), 'report-backup');
-        const historyBackupDir = external_node_path_namespaceObject.join(external_node_path_namespaceObject.dirname(io.WORKSPACE), 'history-backup');
+        const backupDir = (0,external_node_path_namespaceObject.join)((0,external_node_path_namespaceObject.dirname)(io.WORKSPACE), 'report-backup');
+        const historyBackupDir = (0,external_node_path_namespaceObject.join)((0,external_node_path_namespaceObject.dirname)(io.WORKSPACE), 'history-backup');
         let backupCreated = false;
         try {
             await withRetry(async () => {
@@ -44559,7 +44559,7 @@ class GithubPagesService {
                     await (0,promises_namespaceObject.cp)(backupDir, this.reportDir, { recursive: true });
                     // Restore history backup — overwrites remote history with our generated version
                     if (this.historyPath && (0,external_node_fs_namespaceObject.existsSync)(historyBackupDir)) {
-                        await (0,promises_namespaceObject.cp)(historyBackupDir, external_node_path_namespaceObject.dirname(this.historyPath), { recursive: true });
+                        await (0,promises_namespaceObject.cp)(historyBackupDir, (0,external_node_path_namespaceObject.dirname)(this.historyPath), { recursive: true });
                     }
                     await this.prepareAndCommit();
                 }
@@ -44570,8 +44570,8 @@ class GithubPagesService {
                     // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {
                         await (0,promises_namespaceObject.cp)(this.reportDir, backupDir, { recursive: true });
-                        if (this.historyPath && (0,external_node_fs_namespaceObject.existsSync)(external_node_path_namespaceObject.dirname(this.historyPath))) {
-                            await (0,promises_namespaceObject.cp)(external_node_path_namespaceObject.dirname(this.historyPath), historyBackupDir, { recursive: true });
+                        if (this.historyPath && (0,external_node_fs_namespaceObject.existsSync)((0,external_node_path_namespaceObject.dirname)(this.historyPath))) {
+                            await (0,promises_namespaceObject.cp)((0,external_node_path_namespaceObject.dirname)(this.historyPath), historyBackupDir, { recursive: true });
                         }
                         backupCreated = true;
                     }
@@ -44638,18 +44638,18 @@ async function copyFiles({ from, to, concurrency = 10, overwrite = false, }) {
     const limit = pLimit(concurrency);
     const copyPromises = [];
     let successCount = 0;
-    await promises_namespaceObject.mkdir(to, { recursive: true });
+    await (0,promises_namespaceObject.mkdir)(to, { recursive: true });
     for (const dir of from) {
         try {
-            const files = await promises_namespaceObject.readdir(dir, { withFileTypes: true });
+            const files = await (0,promises_namespaceObject.readdir)(dir, { withFileTypes: true });
             for (const file of files) {
                 if (!file.isFile())
                     continue;
                 copyPromises.push(limit(async () => {
                     try {
-                        const fileToCopy = external_node_path_namespaceObject.join(dir, file.name);
-                        const destination = external_node_path_namespaceObject.join(to, file.name);
-                        await promises_namespaceObject.cp(fileToCopy, destination, { force: overwrite, errorOnExist: !overwrite });
+                        const fileToCopy = (0,external_node_path_namespaceObject.join)(dir, file.name);
+                        const destination = (0,external_node_path_namespaceObject.join)(to, file.name);
+                        await (0,promises_namespaceObject.cp)(fileToCopy, destination, { force: overwrite, errorOnExist: !overwrite });
                         successCount++;
                     }
                     catch (error) {
@@ -44670,8 +44670,8 @@ async function copyFiles({ from, to, concurrency = 10, overwrite = false, }) {
 
 
 async function readJsonFile(filePath) {
-    const absolutePath = external_node_path_namespaceObject.resolve(filePath);
-    const fileContents = await promises_namespaceObject.readFile(absolutePath, 'utf-8');
+    const absolutePath = (0,external_node_path_namespaceObject.resolve)(filePath);
+    const fileContents = await (0,promises_namespaceObject.readFile)(absolutePath, 'utf-8');
     return JSON.parse(fileContents);
 }
 /**
@@ -44681,14 +44681,14 @@ async function readJsonFile(filePath) {
  */
 async function getTestDuration(resultsDir) {
     try {
-        const files = await promises_namespaceObject.readdir(resultsDir);
+        const files = await (0,promises_namespaceObject.readdir)(resultsDir);
         let minStart = Infinity;
         let maxStop = 0;
         for (const file of files) {
             if (!file.endsWith('-result.json'))
                 continue;
             try {
-                const result = await readJsonFile(external_node_path_namespaceObject.join(resultsDir, file));
+                const result = await readJsonFile((0,external_node_path_namespaceObject.join)(resultsDir, file));
                 if (result.start)
                     minStart = Math.min(minStart, result.start);
                 if (result.stop)
@@ -44710,8 +44710,8 @@ async function getTestDuration(resultsDir) {
 async function getReportStats(reportDir) {
     // Try summary.json first (has both stats and duration)
     const summaryCandidates = [
-        external_node_path_namespaceObject.join(reportDir, 'summary.json'),
-        external_node_path_namespaceObject.join(reportDir, 'awesome', 'summary.json'),
+        (0,external_node_path_namespaceObject.join)(reportDir, 'summary.json'),
+        (0,external_node_path_namespaceObject.join)(reportDir, 'awesome', 'summary.json'),
     ];
     for (const summaryPath of summaryCandidates) {
         try {
@@ -44736,8 +44736,8 @@ async function getReportStats(reportDir) {
     }
     // Fallback to statistic.json (no duration)
     const statCandidates = [
-        external_node_path_namespaceObject.join(reportDir, 'widgets', 'statistic.json'),
-        external_node_path_namespaceObject.join(reportDir, 'awesome', 'widgets', 'statistic.json'),
+        (0,external_node_path_namespaceObject.join)(reportDir, 'widgets', 'statistic.json'),
+        (0,external_node_path_namespaceObject.join)(reportDir, 'awesome', 'widgets', 'statistic.json'),
     ];
     for (const statsPath of statCandidates) {
         try {
@@ -44764,7 +44764,7 @@ async function getReportStats(reportDir) {
 async function validateResultsPaths(commaSeparatedResultPaths) {
     if (!commaSeparatedResultPaths.includes(',')) {
         const trimmed = commaSeparatedResultPaths.trim();
-        const exists = await promises_namespaceObject.access(trimmed)
+        const exists = await (0,promises_namespaceObject.access)(trimmed)
             .then(() => true)
             .catch(() => false);
         return exists ? [trimmed] : [];
@@ -44773,7 +44773,7 @@ async function validateResultsPaths(commaSeparatedResultPaths) {
     const validPaths = [];
     for (const p of paths) {
         const trimmedPath = p.trim();
-        const exists = await promises_namespaceObject.access(trimmedPath)
+        const exists = await (0,promises_namespaceObject.access)(trimmedPath)
             .then(() => true)
             .catch(() => false);
         if (exists) {
@@ -44822,12 +44822,12 @@ async function runDeployMode() {
         }
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
         // reportDir == workspace/page-source-path/prefix/run-id
-        const reportSubDir = external_node_path_namespaceObject.join(pagesSourcePath, io.prefix ?? '', Date.now().toString());
-        const reportDir = external_node_path_namespaceObject.join(io.WORKSPACE, reportSubDir);
+        const reportSubDir = (0,external_node_path_namespaceObject.join)(pagesSourcePath, io.prefix ?? '', Date.now().toString());
+        const reportDir = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
         // History lives on gh-pages at {prefix}/history/history.jsonl
-        const historyDir = external_node_path_namespaceObject.join(io.WORKSPACE, pagesSourcePath, io.prefix ?? '', 'history');
-        const historyPath = external_node_path_namespaceObject.join(historyDir, 'history.jsonl');
+        const historyDir = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, pagesSourcePath, io.prefix ?? '', 'history');
+        const historyPath = (0,external_node_path_namespaceObject.join)(historyDir, 'history.jsonl');
         const ghPages = createGitHubPagesService({
             token: io.github_token,
             owner,
@@ -44900,7 +44900,7 @@ async function runSummaryMode() {
         });
         await ghPages.setupBranch();
         // Scan prefixes and read summary.json from each
-        const rootDir = external_node_path_namespaceObject.join(io.WORKSPACE, pagesSourcePath);
+        const rootDir = (0,external_node_path_namespaceObject.join)(io.WORKSPACE, pagesSourcePath);
         const rows = await scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath);
         if (rows.length === 0) {
             warning('No report summaries found on gh-pages. Skipping summary.');
@@ -44908,7 +44908,7 @@ async function runSummaryMode() {
         }
         rows.sort((a, b) => (a.notDeployed ? 1 : 0) - (b.notDeployed ? 1 : 0));
         const table = buildSummaryTable(rows);
-        const summaryPageLink = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" align="absmiddle" />&nbsp;&nbsp;<a href="${normalizeUrl(pagesUrl)}">Summary Page</a>`;
+        const summaryPageLink = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" style="vertical-align: middle" />&nbsp;&nbsp;<a href="${normalizeUrl(pagesUrl)}">Summary Page</a>`;
         const message = `${summaryPageLink}\n\n${table}`;
         const githubService = new GitHubService();
         await githubService.updateSummary(message);
@@ -44993,7 +44993,7 @@ async function writeDeployMeta(reportDir, wallClockDuration) {
         wallClockDuration,
         timestamp: Date.now(),
     };
-    await (0,promises_namespaceObject.writeFile)(external_node_path_namespaceObject.join(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
+    await (0,promises_namespaceObject.writeFile)((0,external_node_path_namespaceObject.join)(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
 }
 /**
  * Detects previous attempts for the current runId by scanning deploy.json files
@@ -45005,7 +45005,7 @@ async function detectReruns(reportDir, pagesUrl, pagesSourcePath) {
     if (!runAttempt || runAttempt <= 1 || !io.prefix)
         return undefined;
     try {
-        const prefixDir = external_node_path_namespaceObject.dirname(reportDir);
+        const prefixDir = (0,external_node_path_namespaceObject.dirname)(reportDir);
         const runs = await (0,promises_namespaceObject.readdir)(prefixDir);
         const runDirs = runs
             .filter((r) => /^\d+$/.test(r))
@@ -45014,11 +45014,11 @@ async function detectReruns(reportDir, pagesUrl, pagesSourcePath) {
         if (deployMetas.length <= 1)
             return undefined;
         deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
-        const originalDir = external_node_path_namespaceObject.join(pagesSourcePath, io.prefix, deployMetas[0].dir);
+        const originalDir = (0,external_node_path_namespaceObject.join)(pagesSourcePath, io.prefix, deployMetas[0].dir);
         const originalUrl = normalizeUrl(`${pagesUrl}/${originalDir}`);
         const reruns = [];
         for (let i = 1; i < deployMetas.length; i++) {
-            const rerunDir = external_node_path_namespaceObject.join(pagesSourcePath, io.prefix, deployMetas[i].dir);
+            const rerunDir = (0,external_node_path_namespaceObject.join)(pagesSourcePath, io.prefix, deployMetas[i].dir);
             reruns.push({
                 attempt: deployMetas[i].meta.runAttempt,
                 url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
@@ -45058,7 +45058,7 @@ async function finalizeDeployment({ host, reportDir, }) {
 async function copyReportToCustomDir(reportDir) {
     if (io.custom_report_dir) {
         try {
-            await copyDirectory(reportDir, external_node_path_namespaceObject.resolve(io.custom_report_dir));
+            await copyDirectory(reportDir, (0,external_node_path_namespaceObject.resolve)(io.custom_report_dir));
         }
         catch (e) {
             error(`${e}`);
@@ -45095,7 +45095,7 @@ async function scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath) {
         // Case-insensitive match to find actual directory name on disk
         const dirName = dirEntries.find((e) => e.toLowerCase() === prefixName.toLowerCase());
         if (dirName) {
-            const prefixDir = external_node_path_namespaceObject.join(rootDir, dirName);
+            const prefixDir = (0,external_node_path_namespaceObject.join)(rootDir, dirName);
             const row = await scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath);
             if (row) {
                 rows.push(row);
@@ -45135,7 +45135,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     // Use latest attempt for stats, or latest run dir if no meta matches
     const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
     const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
-    const summary = await readSummaryFromDir(external_node_path_namespaceObject.join(prefixDir, primaryDir));
+    const summary = await readSummaryFromDir((0,external_node_path_namespaceObject.join)(prefixDir, primaryDir));
     if (!summary)
         return undefined;
     const summaryStats = summary.stats ?? summary.statistic;
@@ -45145,7 +45145,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     const reruns = [];
     if (deployMetas.length > 1) {
         for (let i = 1; i < deployMetas.length; i++) {
-            const rerunDir = external_node_path_namespaceObject.join(pagesSourcePath, dirName, deployMetas[i].dir);
+            const rerunDir = (0,external_node_path_namespaceObject.join)(pagesSourcePath, dirName, deployMetas[i].dir);
             reruns.push({
                 attempt: deployMetas[i].meta.runAttempt,
                 url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
@@ -45154,8 +45154,8 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     }
     // Use first attempt as Report link when reruns exist, otherwise latest
     const reportDir = deployMetas.length > 1
-        ? external_node_path_namespaceObject.join(pagesSourcePath, dirName, deployMetas[0].dir)
-        : external_node_path_namespaceObject.join(pagesSourcePath, dirName, primaryDir);
+        ? (0,external_node_path_namespaceObject.join)(pagesSourcePath, dirName, deployMetas[0].dir)
+        : (0,external_node_path_namespaceObject.join)(pagesSourcePath, dirName, primaryDir);
     return {
         reportName: summary.name ?? dirName,
         reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
@@ -45178,7 +45178,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
 async function findDeployMetasForRun(prefixDir, runDirs, runId) {
     const deployMetas = [];
     for (const dir of runDirs) {
-        const metaPath = external_node_path_namespaceObject.join(prefixDir, dir, 'deploy.json');
+        const metaPath = (0,external_node_path_namespaceObject.join)(prefixDir, dir, 'deploy.json');
         try {
             const raw = JSON.parse(await (0,promises_namespaceObject.readFile)(metaPath, 'utf8'));
             if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number')
@@ -45200,7 +45200,7 @@ async function findDeployMetasForRun(prefixDir, runDirs, runId) {
 /** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */
 async function readSummaryFromDir(reportDir) {
     for (const candidate of ['summary.json', 'awesome/summary.json']) {
-        const summaryPath = external_node_path_namespaceObject.join(reportDir, candidate);
+        const summaryPath = (0,external_node_path_namespaceObject.join)(reportDir, candidate);
         if (!(0,external_node_fs_namespaceObject.existsSync)(summaryPath))
             continue;
         try {
@@ -45223,7 +45223,7 @@ async function findLatestSummary(prefixDir) {
         .sort((a, b) => Number(b) - Number(a))[0];
     if (!latestRunDir)
         return undefined;
-    return readSummaryFromDir(external_node_path_namespaceObject.join(prefixDir, latestRunDir));
+    return readSummaryFromDir((0,external_node_path_namespaceObject.join)(prefixDir, latestRunDir));
 }
 
 ;// CONCATENATED MODULE: ./dist/index.js

@@ -1,5 +1,8 @@
 # Allure Deployer Action
 
+[![CI](https://github.com/deivydasp/allure-deployer-action-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/deivydasp/allure-deployer-action-v2/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/deivydasp/allure-deployer-action-v2/blob/master/LICENSE)
+
 Deploy Allure 3 test reports to GitHub Pages with History, Report Aggregation, and a Summary Landing Page.
 
 **Supported Runners:**

@@ -2,7 +2,7 @@ import { CommandRunner } from '../interfaces/command.interface.js';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import * as path from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 let allureCliPath: string | undefined;
@@ -10,8 +10,8 @@ let allureCliPath: string | undefined;
 function resolveAllureCli(): string {
     if (allureCliPath) return allureCliPath;
     const require = createRequire(import.meta.url);
-    const allurePkgDir = path.dirname(require.resolve('allure'));
-    const resolved = path.resolve(allurePkgDir, '..', 'cli.js');
+    const allurePkgDir = dirname(require.resolve('allure'));
+    const resolved = resolve(allurePkgDir, '..', 'cli.js');
     if (!existsSync(resolved)) {
         throw new Error(`Allure CLI not found at ${resolved}. The allure package structure may have changed.`);
     }

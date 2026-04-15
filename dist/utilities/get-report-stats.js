@@ -1,8 +1,8 @@
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 async function readJsonFile(filePath) {
-    const absolutePath = path.resolve(filePath);
-    const fileContents = await fs.readFile(absolutePath, 'utf-8');
+    const absolutePath = resolve(filePath);
+    const fileContents = await readFile(absolutePath, 'utf-8');
     return JSON.parse(fileContents);
 }
 /**
@@ -12,14 +12,14 @@ async function readJsonFile(filePath) {
  */
 export async function getTestDuration(resultsDir) {
     try {
-        const files = await fs.readdir(resultsDir);
+        const files = await readdir(resultsDir);
         let minStart = Infinity;
         let maxStop = 0;
         for (const file of files) {
             if (!file.endsWith('-result.json'))
                 continue;
             try {
-                const result = await readJsonFile(path.join(resultsDir, file));
+                const result = await readJsonFile(join(resultsDir, file));
                 if (result.start)
                     minStart = Math.min(minStart, result.start);
                 if (result.stop)
@@ -41,8 +41,8 @@ export async function getTestDuration(resultsDir) {
 export async function getReportStats(reportDir) {
     // Try summary.json first (has both stats and duration)
     const summaryCandidates = [
-        path.join(reportDir, 'summary.json'),
-        path.join(reportDir, 'awesome', 'summary.json'),
+        join(reportDir, 'summary.json'),
+        join(reportDir, 'awesome', 'summary.json'),
     ];
     for (const summaryPath of summaryCandidates) {
         try {
@@ -67,8 +67,8 @@ export async function getReportStats(reportDir) {
     }
     // Fallback to statistic.json (no duration)
     const statCandidates = [
-        path.join(reportDir, 'widgets', 'statistic.json'),
-        path.join(reportDir, 'awesome', 'widgets', 'statistic.json'),
+        join(reportDir, 'widgets', 'statistic.json'),
+        join(reportDir, 'awesome', 'widgets', 'statistic.json'),
     ];
     for (const statsPath of statCandidates) {
         try {

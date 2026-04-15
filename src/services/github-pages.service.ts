@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, rmSync, type Dirent } from 'node:fs';
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { simpleGit, CheckRepoActions, SimpleGit } from 'simple-git';
 import { context } from '@actions/github';
 import pLimit from 'p-limit';
@@ -75,7 +75,7 @@ export class GithubPagesService implements HostingProvider {
         await this.deleteOldReports();
 
         // Disable Jekyll processing so files like _version are served correctly
-        const nojekyllPath = path.join(inputs.WORKSPACE, this.pagesSourcePath, '.nojekyll');
+        const nojekyllPath = join(inputs.WORKSPACE, this.pagesSourcePath, '.nojekyll');
         if (!existsSync(nojekyllPath)) {
             await writeFile(nojekyllPath, '', 'utf8');
             await this.git.add(nojekyllPath);
@@ -86,7 +86,7 @@ export class GithubPagesService implements HostingProvider {
             await this.createRootSummaryPage();
         }
 
-        if (!existsSync(path.join(this.reportDir, 'index.html'))) {
+        if (!existsSync(join(this.reportDir, 'index.html'))) {
             throw new Error(`No index.html found in ${this.reportDir}. Deployment aborted.`);
         }
         await this.git.add(`${removeTrailingSlash(this.reportDir)}/*`);
@@ -143,10 +143,10 @@ export class GithubPagesService implements HostingProvider {
      *  with cache-busting, so even a browser-cached page always finds the current report. */
     private async createRedirectPage(redirectUrl: string): Promise<void> {
         const targetUrl = normalizeUrl(`${redirectUrl}/index.html`);
-        const prefixDir = path.join(inputs.WORKSPACE, this.pagesSourcePath, inputs.prefix ?? '');
+        const prefixDir = join(inputs.WORKSPACE, this.pagesSourcePath, inputs.prefix ?? '');
 
         // Write target URL to _latest (fetched dynamically by the redirect page)
-        const latestPath = path.join(prefixDir, '_latest');
+        const latestPath = join(prefixDir, '_latest');
         await writeFile(latestPath, targetUrl, 'utf8');
         await this.git.add(latestPath);
 
@@ -154,22 +154,22 @@ export class GithubPagesService implements HostingProvider {
         const htmlContent = `<!DOCTYPE html>
 <html><head><script>fetch("_latest?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(u){window.location.replace(u.trim())}).catch(function(){document.body.textContent="Failed to load report. Please refresh."});</script></head><body></body></html>`;
 
-        const filePath = path.join(prefixDir, 'index.html');
+        const filePath = join(prefixDir, 'index.html');
         await writeFile(filePath, htmlContent);
         await this.git.add(filePath);
-        info(`Redirect 'index.html' created at ${path.posix.join(this.pagesSourcePath || '/', inputs.prefix ?? '')}`);
+        info(`Redirect 'index.html' created at ${posix.join(this.pagesSourcePath || '/', inputs.prefix ?? '')}`);
     }
 
     /** Creates a root index.html summary page using allure's built-in summary generator */
     private async createRootSummaryPage(): Promise<void> {
         try {
-            const rootDir = path.join(inputs.WORKSPACE, this.pagesSourcePath);
+            const rootDir = join(inputs.WORKSPACE, this.pagesSourcePath);
             const entries = await readdir(rootDir, { withFileTypes: true });
 
             const summaries: Record<string, unknown>[] = [];
             for (const entry of entries) {
                 if (!entry.isDirectory()) continue;
-                const prefixDir = path.join(rootDir, entry.name);
+                const prefixDir = join(rootDir, entry.name);
 
                 // Only include prefixes that have numeric run subdirs (deployed reports)
                 const runs = await readdir(prefixDir, { withFileTypes: true }).catch((e: unknown) => {
@@ -182,10 +182,10 @@ export class GithubPagesService implements HostingProvider {
 
                 if (runDirs.length === 0) continue;
 
-                const latestDir = path.join(prefixDir, runDirs[0].name);
+                const latestDir = join(prefixDir, runDirs[0].name);
                 try {
                     for (const candidate of ['summary.json', 'awesome/summary.json']) {
-                        const summaryPath = path.join(latestDir, candidate);
+                        const summaryPath = join(latestDir, candidate);
                         if (existsSync(summaryPath)) {
                             const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
                             // Normalize Allure v2 format (statistic) to v3 format (stats)
@@ -219,7 +219,7 @@ export class GithubPagesService implements HostingProvider {
             }
             await generateSummary(rootDir, summaries);
             await this.injectDeployBanner(rootDir);
-            await this.git.add(path.join(rootDir, 'index.html'));
+            await this.git.add(join(rootDir, 'index.html'));
             info('Root summary page created');
         } catch (e) {
             warning(`Failed to create root summary page: ${e}`);
@@ -241,11 +241,11 @@ export class GithubPagesService implements HostingProvider {
     private async injectDeployBanner(rootDir: string): Promise<void> {
         const version = Date.now().toString();
         this.deployVersion = version;
-        const versionPath = path.join(rootDir, '_version');
+        const versionPath = join(rootDir, '_version');
         await writeFile(versionPath, version, 'utf8');
         await this.git.add(versionPath);
 
-        const indexPath = path.join(rootDir, 'index.html');
+        const indexPath = join(rootDir, 'index.html');
         let html = await readFile(indexPath, 'utf8');
 
         const script = [
@@ -288,14 +288,14 @@ export class GithubPagesService implements HostingProvider {
     /** Deletes old Allure reports, keeping the latest `inputs.keep` */
     private async deleteOldReports(): Promise<void> {
         try {
-            const parentDir = path.dirname(this.reportDir);
+            const parentDir = dirname(this.reportDir);
             const entries: Dirent[] = await readdir(parentDir, { withFileTypes: true });
 
             // Single pass: filter report directories (name is a Date.now() timestamp)
             const reports: { dir: string; name: string }[] = [];
             for (const entry of entries) {
                 if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue;
-                reports.push({ dir: path.join(entry.parentPath, entry.name), name: entry.name });
+                reports.push({ dir: join(entry.parentPath, entry.name), name: entry.name });
             }
 
             if (reports.length > inputs.keep) {
@@ -337,8 +337,8 @@ export class GithubPagesService implements HostingProvider {
     /** Handles Git push with retry logic specifically for concurrent push scenarios */
     private async gitPushWithRetry(): Promise<void> {
         // Backup created lazily on first push rejection — avoids unnecessary I/O on happy path
-        const backupDir = path.join(path.dirname(inputs.WORKSPACE), 'report-backup');
-        const historyBackupDir = path.join(path.dirname(inputs.WORKSPACE), 'history-backup');
+        const backupDir = join(dirname(inputs.WORKSPACE), 'report-backup');
+        const historyBackupDir = join(dirname(inputs.WORKSPACE), 'history-backup');
         let backupCreated = false;
 
         try {
@@ -355,7 +355,7 @@ export class GithubPagesService implements HostingProvider {
                     await cp(backupDir, this.reportDir, { recursive: true });
                     // Restore history backup — overwrites remote history with our generated version
                     if (this.historyPath && existsSync(historyBackupDir)) {
-                        await cp(historyBackupDir, path.dirname(this.historyPath), { recursive: true });
+                        await cp(historyBackupDir, dirname(this.historyPath), { recursive: true });
                     }
                     await this.prepareAndCommit();
                 }
@@ -366,8 +366,8 @@ export class GithubPagesService implements HostingProvider {
                     // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {
                         await cp(this.reportDir, backupDir, { recursive: true });
-                        if (this.historyPath && existsSync(path.dirname(this.historyPath))) {
-                            await cp(path.dirname(this.historyPath), historyBackupDir, { recursive: true });
+                        if (this.historyPath && existsSync(dirname(this.historyPath))) {
+                            await cp(dirname(this.historyPath), historyBackupDir, { recursive: true });
                         }
                         backupCreated = true;
                     }

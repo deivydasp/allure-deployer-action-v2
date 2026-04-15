@@ -3,7 +3,7 @@ import * as github from '@actions/github';
 import { RequestError } from '@octokit/request-error';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import normalizeUrl from 'normalize-url';
 import inputs from './io.js';
 import { ConsoleNotifier } from './notifiers/console.notifier.js';
@@ -36,12 +36,12 @@ async function runDeployMode() {
         }
         const { owner, repo, pagesSourcePath, pagesUrl } = await validateGitHubPages();
         // reportDir == workspace/page-source-path/prefix/run-id
-        const reportSubDir = path.join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
-        const reportDir = path.join(inputs.WORKSPACE, reportSubDir);
+        const reportSubDir = join(pagesSourcePath, inputs.prefix ?? '', Date.now().toString());
+        const reportDir = join(inputs.WORKSPACE, reportSubDir);
         const pageUrl = normalizeUrl(`${pagesUrl}/${reportSubDir}`);
         // History lives on gh-pages at {prefix}/history/history.jsonl
-        const historyDir = path.join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
-        const historyPath = path.join(historyDir, 'history.jsonl');
+        const historyDir = join(inputs.WORKSPACE, pagesSourcePath, inputs.prefix ?? '', 'history');
+        const historyPath = join(historyDir, 'history.jsonl');
         const ghPages = createGitHubPagesService({
             token: inputs.github_token,
             owner,
@@ -114,7 +114,7 @@ async function runSummaryMode() {
         });
         await ghPages.setupBranch();
         // Scan prefixes and read summary.json from each
-        const rootDir = path.join(inputs.WORKSPACE, pagesSourcePath);
+        const rootDir = join(inputs.WORKSPACE, pagesSourcePath);
         const rows = await scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath);
         if (rows.length === 0) {
             warning('No report summaries found on gh-pages. Skipping summary.');
@@ -122,7 +122,7 @@ async function runSummaryMode() {
         }
         rows.sort((a, b) => (a.notDeployed ? 1 : 0) - (b.notDeployed ? 1 : 0));
         const table = buildSummaryTable(rows);
-        const summaryPageLink = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" align="absmiddle" />&nbsp;&nbsp;<a href="${normalizeUrl(pagesUrl)}">Summary Page</a>`;
+        const summaryPageLink = `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" style="vertical-align: middle" />&nbsp;&nbsp;<a href="${normalizeUrl(pagesUrl)}">Summary Page</a>`;
         const message = `${summaryPageLink}\n\n${table}`;
         const githubService = new GitHubService();
         await githubService.updateSummary(message);
@@ -208,7 +208,7 @@ async function writeDeployMeta(reportDir, wallClockDuration) {
         wallClockDuration,
         timestamp: Date.now(),
     };
-    await writeFile(path.join(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
+    await writeFile(join(reportDir, 'deploy.json'), JSON.stringify(meta), 'utf8');
 }
 /**
  * Detects previous attempts for the current runId by scanning deploy.json files
@@ -220,7 +220,7 @@ async function detectReruns(reportDir, pagesUrl, pagesSourcePath) {
     if (!runAttempt || runAttempt <= 1 || !inputs.prefix)
         return undefined;
     try {
-        const prefixDir = path.dirname(reportDir);
+        const prefixDir = dirname(reportDir);
         const runs = await readdir(prefixDir);
         const runDirs = runs
             .filter((r) => /^\d+$/.test(r))
@@ -229,11 +229,11 @@ async function detectReruns(reportDir, pagesUrl, pagesSourcePath) {
         if (deployMetas.length <= 1)
             return undefined;
         deployMetas.sort((a, b) => a.meta.runAttempt - b.meta.runAttempt);
-        const originalDir = path.join(pagesSourcePath, inputs.prefix, deployMetas[0].dir);
+        const originalDir = join(pagesSourcePath, inputs.prefix, deployMetas[0].dir);
         const originalUrl = normalizeUrl(`${pagesUrl}/${originalDir}`);
         const reruns = [];
         for (let i = 1; i < deployMetas.length; i++) {
-            const rerunDir = path.join(pagesSourcePath, inputs.prefix, deployMetas[i].dir);
+            const rerunDir = join(pagesSourcePath, inputs.prefix, deployMetas[i].dir);
             reruns.push({
                 attempt: deployMetas[i].meta.runAttempt,
                 url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
@@ -273,7 +273,7 @@ async function finalizeDeployment({ host, reportDir, }) {
 async function copyReportToCustomDir(reportDir) {
     if (inputs.custom_report_dir) {
         try {
-            await copyDirectory(reportDir, path.resolve(inputs.custom_report_dir));
+            await copyDirectory(reportDir, resolve(inputs.custom_report_dir));
         }
         catch (e) {
             error(`${e}`);
@@ -310,7 +310,7 @@ async function scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath) {
         // Case-insensitive match to find actual directory name on disk
         const dirName = dirEntries.find((e) => e.toLowerCase() === prefixName.toLowerCase());
         if (dirName) {
-            const prefixDir = path.join(rootDir, dirName);
+            const prefixDir = join(rootDir, dirName);
             const row = await scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath);
             if (row) {
                 rows.push(row);
@@ -350,7 +350,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     // Use latest attempt for stats, or latest run dir if no meta matches
     const primaryDir = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].dir : runDirs[0];
     const primaryMeta = deployMetas.length > 0 ? deployMetas[deployMetas.length - 1].meta : undefined;
-    const summary = await readSummaryFromDir(path.join(prefixDir, primaryDir));
+    const summary = await readSummaryFromDir(join(prefixDir, primaryDir));
     if (!summary)
         return undefined;
     const summaryStats = summary.stats ?? summary.statistic;
@@ -360,7 +360,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     const reruns = [];
     if (deployMetas.length > 1) {
         for (let i = 1; i < deployMetas.length; i++) {
-            const rerunDir = path.join(pagesSourcePath, dirName, deployMetas[i].dir);
+            const rerunDir = join(pagesSourcePath, dirName, deployMetas[i].dir);
             reruns.push({
                 attempt: deployMetas[i].meta.runAttempt,
                 url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
@@ -369,8 +369,8 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     }
     // Use first attempt as Report link when reruns exist, otherwise latest
     const reportDir = deployMetas.length > 1
-        ? path.join(pagesSourcePath, dirName, deployMetas[0].dir)
-        : path.join(pagesSourcePath, dirName, primaryDir);
+        ? join(pagesSourcePath, dirName, deployMetas[0].dir)
+        : join(pagesSourcePath, dirName, primaryDir);
     return {
         reportName: summary.name ?? dirName,
         reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
@@ -393,7 +393,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
 async function findDeployMetasForRun(prefixDir, runDirs, runId) {
     const deployMetas = [];
     for (const dir of runDirs) {
-        const metaPath = path.join(prefixDir, dir, 'deploy.json');
+        const metaPath = join(prefixDir, dir, 'deploy.json');
         try {
             const raw = JSON.parse(await readFile(metaPath, 'utf8'));
             if (typeof raw.runId !== 'number' || typeof raw.runAttempt !== 'number')
@@ -415,7 +415,7 @@ async function findDeployMetasForRun(prefixDir, runDirs, runId) {
 /** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */
 async function readSummaryFromDir(reportDir) {
     for (const candidate of ['summary.json', 'awesome/summary.json']) {
-        const summaryPath = path.join(reportDir, candidate);
+        const summaryPath = join(reportDir, candidate);
         if (!existsSync(summaryPath))
             continue;
         try {
@@ -438,5 +438,5 @@ async function findLatestSummary(prefixDir) {
         .sort((a, b) => Number(b) - Number(a))[0];
     if (!latestRunDir)
         return undefined;
-    return readSummaryFromDir(path.join(prefixDir, latestRunDir));
+    return readSummaryFromDir(join(prefixDir, latestRunDir));
 }

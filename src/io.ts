@@ -1,6 +1,6 @@
 import { DefaultConfig, input, Inputs } from './interfaces/inputs.interface.js';
 import { getInput, getBooleanInput, setSecret } from '@actions/core';
-import path from 'node:path';
+import { join } from 'node:path';
 import os from 'node:os';
 
 function getTypedInput<T extends input>(name: T, required: boolean = false): Inputs[T] {
@@ -33,7 +33,7 @@ const inputs: Inputs & DefaultConfig = {
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
-    RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
+    RESULTS_STAGING_PATH: join(runtimeDir(), 'allure-results'),
     WORKSPACE: workspace(),
 };
 
@@ -52,10 +52,10 @@ function prefix(): string | undefined {
 }
 
 function workspace(): string {
-    return path.join(runtimeDir(), 'report');
+    return join(runtimeDir(), 'report');
 }
 function runtimeDir(): string {
-    return path.join(os.tmpdir(), 'allure-report-deployer');
+    return join(os.tmpdir(), 'allure-report-deployer');
 }
 
 export default inputs;

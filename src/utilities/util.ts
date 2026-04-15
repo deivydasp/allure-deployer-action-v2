@@ -1,5 +1,5 @@
 import { info, warning } from '@actions/core';
-import * as fs from 'node:fs/promises';
+import { cp } from 'node:fs/promises';
 
 /**
  * Configuration for retry logic
@@ -92,7 +92,7 @@ export async function withRetry<T>(
 }
 
 export async function copyDirectory(sourceDir: string, destDir: string): Promise<void> {
-    await fs.cp(sourceDir, destDir, { recursive: true });
+    await cp(sourceDir, destDir, { recursive: true });
     info(`Copied directory from ${sourceDir} to ${destDir}`);
 }
 

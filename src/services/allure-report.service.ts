@@ -1,5 +1,5 @@
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { info, warning } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
 import { CommandRunner } from '../interfaces/command.interface.js';
@@ -28,7 +28,7 @@ export class Allure {
     readEnvironments(): Map<string, string> | undefined {
         try {
             const properties = propertiesReader({
-                sourceFile: path.join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
+                sourceFile: join(this.config.RESULTS_STAGING_PATH, 'environment.properties'),
             });
             const map = new Map<string, string>();
             info('Environments');
@@ -47,8 +47,8 @@ export class Allure {
 
     async generate(executor?: ExecutorInterface): Promise<string> {
         if (executor) {
-            const executorPath = path.join(this.config.RESULTS_STAGING_PATH, 'executor.json');
-            await fs.writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
+            const executorPath = join(this.config.RESULTS_STAGING_PATH, 'executor.json');
+            await writeFile(executorPath, JSON.stringify(executor, null, 2), { encoding: 'utf8' });
         }
 
         const configPath = await this.writeAllureConfig();
@@ -96,8 +96,8 @@ export class Allure {
             allurerc.historyLimit = this.config.historyLimit;
         }
 
-        const configPath = path.join(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
-        await fs.writeFile(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
+        const configPath = join(this.config.RESULTS_STAGING_PATH, 'allurerc.json');
+        await writeFile(configPath, JSON.stringify(allurerc, null, 2), 'utf8');
         return configPath;
     }
 
@@ -106,7 +106,7 @@ export class Allure {
      */
     private async postProcessHistory(reportUrl?: string): Promise<void> {
         try {
-            const content = await fs.readFile(this.config.HISTORY_PATH, 'utf8');
+            const content = await readFile(this.config.HISTORY_PATH, 'utf8');
             const trimmed = content.trimEnd();
             if (!trimmed) return;
             let lines = trimmed.split('\n');
@@ -121,7 +121,7 @@ export class Allure {
                 lines = lines.slice(-this.config.historyLimit);
             }
 
-            await fs.writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
+            await writeFile(this.config.HISTORY_PATH, lines.join('\n') + '\n', 'utf8');
         } catch (e) {
             warning(`Failed to post-process history: ${e}`);
         }
@@ -136,17 +136,17 @@ export class Allure {
      */
     private async createHistoryRedirect(): Promise<void> {
         try {
-            const awesomeDir = path.join(this.config.REPORTS_DIR, 'awesome');
+            const awesomeDir = join(this.config.REPORTS_DIR, 'awesome');
             try {
-                const stat = await fs.stat(awesomeDir);
-                if (stat.isDirectory()) return; // multi-plugin mode — awesome/ is a real plugin output
+                const dirStat = await stat(awesomeDir);
+                if (dirStat.isDirectory()) return; // multi-plugin mode — awesome/ is a real plugin output
             } catch {
                 // doesn't exist — create the redirect
             }
-            await fs.mkdir(awesomeDir, { recursive: true });
+            await mkdir(awesomeDir, { recursive: true });
             const html = `<!DOCTYPE html>
 <html><head><script>window.location.replace("../" + window.location.hash);</script></head><body></body></html>`;
-            await fs.writeFile(path.join(awesomeDir, 'index.html'), html, 'utf8');
+            await writeFile(join(awesomeDir, 'index.html'), html, 'utf8');
         } catch (e) {
             warning(`Failed to create history redirect: ${e}`);
         }

@@ -1,5 +1,5 @@
 import { info, warning } from '@actions/core';
-import * as fs from 'node:fs/promises';
+import { cp } from 'node:fs/promises';
 /**
  * Default retry configuration
  */
@@ -64,7 +64,7 @@ export async function withRetry(operation, config = DEFAULT_RETRY_CONFIG) {
     throw new Error('Unreachable: withRetry loop completed without return or throw');
 }
 export async function copyDirectory(sourceDir, destDir) {
-    await fs.cp(sourceDir, destDir, { recursive: true });
+    await cp(sourceDir, destDir, { recursive: true });
     info(`Copied directory from ${sourceDir} to ${destDir}`);
 }
 export async function allFulfilledResults(promises) {

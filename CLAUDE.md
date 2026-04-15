@@ -9,6 +9,7 @@ GitHub Action that deploys Allure test reports to **GitHub Pages** with history 
 ## Build & Development Commands
 
 ```bash
+npm test               # Run unit tests (vitest) — run before build
 npm run build          # TypeScript compile + ncc bundle (dist/main/ and dist/cleanup/)
 npm run lint           # ESLint on src/
 ```
@@ -16,8 +17,17 @@ npm run lint           # ESLint on src/
 ### Testing
 
 A CI workflow (`.github/workflows/ci.yml`) runs automatically on push to master when source or config files change. It:
-1. Validates the build (`tsc --noEmit`) and lint (`eslint`)
-2. Triggers all 9 test workflows (3 at a time via `max-parallel: 3`)
+1. Runs unit tests (`npm test`), validates the build (`tsc --noEmit`), and lint (`eslint`)
+2. Triggers all 9 integration test workflows (3 at a time via `max-parallel: 3`)
+
+#### Unit Tests
+
+```bash
+npm test               # Run once (CI)
+npm run test:watch     # Watch mode (development)
+```
+
+Unit tests use **vitest** with `pool: 'forks'` (required for `@actions/core` compatibility). Tests are in `__tests__/` mirroring the `src/` structure. Always run `npm test` before `npm run build` — tests catch library breakage before the bundle is produced.
 
 After pushing, verify CI and test results:
 
@@ -40,6 +50,8 @@ The action runs on **Node 24**. The build produces two ncc bundles:
 `dist/` is committed to git (GitHub Actions runs it directly). `node_modules/` is not — ncc bundles all dependencies except `allure` and `@allurereport/summary` which are externalized (`-e` flags) and installed separately in `dist/main/node_modules/`.
 
 ### Build Pipeline
+
+Before building, always run tests: `npm test && npm run build`
 
 The build script does:
 1. `tsc` — compile TypeScript

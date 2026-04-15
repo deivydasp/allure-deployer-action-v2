@@ -1,5 +1,5 @@
 import { getInput, getBooleanInput, setSecret } from '@actions/core';
-import path from 'node:path';
+import { join } from 'node:path';
 import os from 'node:os';
 function getTypedInput(name, required = false) {
     return getInput(name, { required });
@@ -30,7 +30,7 @@ const inputs = {
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
-    RESULTS_STAGING_PATH: path.join(runtimeDir(), 'allure-results'),
+    RESULTS_STAGING_PATH: join(runtimeDir(), 'allure-results'),
     WORKSPACE: workspace(),
 };
 if (inputs.github_token)
@@ -46,9 +46,9 @@ function prefix() {
     return prefix ? replaceWhiteSpace(prefix) : undefined;
 }
 function workspace() {
-    return path.join(runtimeDir(), 'report');
+    return join(runtimeDir(), 'report');
 }
 function runtimeDir() {
-    return path.join(os.tmpdir(), 'allure-report-deployer');
+    return join(os.tmpdir(), 'allure-report-deployer');
 }
 export default inputs;
