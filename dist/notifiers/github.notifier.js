@@ -24,7 +24,7 @@ export class GitHubNotifier {
             },
         ]);
         const message = data.summaryPageUrl
-            ? `<table><tr><td><img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" /></td><td><a href="${data.summaryPageUrl}">Summary Page</a></td></tr></table>\n\n${table}`
+            ? `<table role="none"><tr><td style="border:none;padding:0"><img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" /></td><td style="border:none;padding:0 8px"><a href="${data.summaryPageUrl}">Summary Page</a></td></tr></table>\n\n${table}`
             : table;
         const promises = [];
         if (data.reportUrl) {
