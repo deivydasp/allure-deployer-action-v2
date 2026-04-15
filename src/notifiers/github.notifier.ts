@@ -38,7 +38,7 @@ export class GitHubNotifier implements Notifier {
             },
         ]);
         const message = data.summaryPageUrl
-            ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" style="vertical-align: middle" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
+            ? `<table><tr><td><img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" /></td><td><a href="${data.summaryPageUrl}">Summary Page</a></td></tr></table>\n\n${table}`
             : table;
 
         const promises: Promise<void>[] = [];
