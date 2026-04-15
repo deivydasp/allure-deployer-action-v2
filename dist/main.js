@@ -122,7 +122,7 @@ async function runSummaryMode() {
         }
         rows.sort((a, b) => (a.notDeployed ? 1 : 0) - (b.notDeployed ? 1 : 0));
         const table = buildSummaryTable(rows);
-        const summaryPageLink = `<table role="none"><tr><td style="border:none;padding:0"><img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg" width="20" height="20" /></td><td style="border:none;padding:0 8px"><a href="${normalizeUrl(pagesUrl)}">Summary Page</a></td></tr></table>`;
+        const summaryPageLink = `[![allure](https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.svg)](${normalizeUrl(pagesUrl)})&nbsp;&nbsp;[Summary Page](${normalizeUrl(pagesUrl)})`;
         const message = `${summaryPageLink}\n\n${table}`;
         const githubService = new GitHubService();
         await githubService.updateSummary(message);
