@@ -24,7 +24,7 @@ export class GitHubNotifier {
             },
         ]);
         const message = data.summaryPageUrl
-            ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.png" alt="allure" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
+            ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.png" alt="allure" align="middle" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
             : table;
         const promises = [];
         if (data.reportUrl) {
