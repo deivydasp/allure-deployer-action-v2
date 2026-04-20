@@ -4,6 +4,6 @@
     "d3-time": "3"
   },
   "dependencies": {
-    "allure": "^3.3.1"
+    "allure": "^3.6.0"
   }
 }

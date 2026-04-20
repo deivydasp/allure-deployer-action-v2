@@ -58,7 +58,7 @@ The build script does:
 2. `ncc build` — bundle into `dist/main/index.js` with `allure` and `@allurereport/summary` as externals
 3. `ncc build` — bundle cleanup into `dist/cleanup/index.js`
 4. `node scripts/patch-dist-package.js` — adds `overrides: { "d3-time": "3" }` to `dist/main/package.json` to fix npm hoisting issue where d3-time@1.x gets hoisted over d3-time@3.x (breaking d3-scale)
-5. `npm install allure@^3.3.1` in `dist/main/` — installs the allure CLI and its dependency tree
+5. `npm install allure@^3.6.0` in `dist/main/` — installs the allure CLI and its dependency tree
 
 ## Architecture
 
