@@ -8,8 +8,33 @@
   "stop": 1700000001000,
   "name": "API health check returns 200",
   "fullName": "api.spec.ts#API health check returns 200",
+  "description": "Smoke test for the /health endpoint.",
   "labels": [
     { "name": "suite", "value": "API" },
-    { "name": "severity", "value": "blocker" }
+    { "name": "severity", "value": "blocker" },
+    { "name": "feature", "value": "Health" }
+  ],
+  "steps": [
+    {
+      "name": "GET /health",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000000,
+      "stop": 1700000000400
+    },
+    {
+      "name": "Assert status code === 200",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000400,
+      "stop": 1700000000600
+    },
+    {
+      "name": "Assert body.status === 'ok'",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000600,
+      "stop": 1700000001000
+    }
   ]
 }

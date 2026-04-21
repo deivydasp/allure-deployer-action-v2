@@ -11,8 +11,29 @@
   "stop": 1700000003500,
   "name": "Database connection pool initializes",
   "fullName": "db.spec.ts#Database connection pool initializes",
+  "description": "Broken test — the test setup itself throws before any assertions run.",
   "labels": [
     { "name": "suite", "value": "Infrastructure" },
     { "name": "severity", "value": "critical" }
+  ],
+  "steps": [
+    {
+      "name": "Load DB configuration from env",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003000,
+      "stop": 1700000003100
+    },
+    {
+      "name": "Initialize connection pool",
+      "status": "broken",
+      "stage": "finished",
+      "start": 1700000003100,
+      "stop": 1700000003500,
+      "statusDetails": {
+        "message": "TypeError: Cannot read properties of undefined (reading 'connect')",
+        "trace": "TypeError: Cannot read properties of undefined (reading 'connect')\n    at DatabaseService.init (src/db.ts:15:22)\n    at Context.<anonymous> (specs/db.spec.ts:8:5)"
+      }
+    }
   ]
 }

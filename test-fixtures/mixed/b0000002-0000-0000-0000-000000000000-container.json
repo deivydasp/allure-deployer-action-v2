@@ -1,0 +1,77 @@
+{
+  "uuid": "b0000002-0000-0000-0000-000000000000",
+  "name": "Mixed suite setup / teardown",
+  "children": [
+    "b0000001-0000-0000-0000-000000000001",
+    "b0000001-0000-0000-0000-000000000002",
+    "b0000001-0000-0000-0000-000000000003",
+    "b0000001-0000-0000-0000-000000000004",
+    "b0000001-0000-0000-0000-000000000005"
+  ],
+  "befores": [
+    {
+      "name": "Set up test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1699999999500,
+      "stop": 1699999999950,
+      "steps": [
+        {
+          "name": "Load environment config (.env.test)",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999500,
+          "stop": 1699999999650
+        },
+        {
+          "name": "Start API mock server",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999650,
+          "stop": 1699999999800
+        },
+        {
+          "name": "Initialize feature flags",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999800,
+          "stop": 1699999999950
+        }
+      ]
+    }
+  ],
+  "afters": [
+    {
+      "name": "Tear down test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000004000,
+      "stop": 1700000004400,
+      "steps": [
+        {
+          "name": "Flush logs and metrics",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000004000,
+          "stop": 1700000004150
+        },
+        {
+          "name": "Stop mock server",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000004150,
+          "stop": 1700000004300
+        },
+        {
+          "name": "Drop test database",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000004300,
+          "stop": 1700000004400
+        }
+      ]
+    }
+  ],
+  "start": 1699999999500,
+  "stop": 1700000004400
+}

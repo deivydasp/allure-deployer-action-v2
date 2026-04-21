@@ -8,8 +8,56 @@
   "stop": 1700000003500,
   "name": "Dashboard loads successfully",
   "fullName": "dashboard.spec.ts#Dashboard loads successfully",
+  "description": "Verifies that all dashboard widgets render within the expected time budget.",
   "labels": [
     { "name": "suite", "value": "Dashboard" },
-    { "name": "severity", "value": "normal" }
+    { "name": "severity", "value": "normal" },
+    { "name": "feature", "value": "Dashboard" }
+  ],
+  "steps": [
+    {
+      "name": "Navigate to /dashboard",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000002000,
+      "stop": 1700000002400
+    },
+    {
+      "name": "Wait for all widgets to render",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000002400,
+      "stop": 1700000003100,
+      "steps": [
+        {
+          "name": "Stats widget rendered",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000002400,
+          "stop": 1700000002700
+        },
+        {
+          "name": "Recent activity widget rendered",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000002700,
+          "stop": 1700000002900
+        },
+        {
+          "name": "Notifications widget rendered",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000002900,
+          "stop": 1700000003100
+        }
+      ]
+    },
+    {
+      "name": "Verify page load time < 1500ms",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003100,
+      "stop": 1700000003500
+    }
   ]
 }

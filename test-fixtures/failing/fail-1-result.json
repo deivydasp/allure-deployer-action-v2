@@ -11,8 +11,40 @@
   "stop": 1700000001000,
   "name": "Login with expired token fails gracefully",
   "fullName": "auth.spec.ts#Login with expired token fails gracefully",
+  "description": "Ensures the API rejects expired tokens with a 401 response and the client surfaces a clear error message.",
+  "parameters": [
+    { "name": "tokenAge", "value": "48h" }
+  ],
   "labels": [
     { "name": "suite", "value": "Authentication" },
-    { "name": "severity", "value": "critical" }
+    { "name": "severity", "value": "critical" },
+    { "name": "feature", "value": "Login" }
+  ],
+  "steps": [
+    {
+      "name": "Generate expired JWT token",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000000,
+      "stop": 1700000000200
+    },
+    {
+      "name": "POST /auth/login with expired token",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000200,
+      "stop": 1700000000500
+    },
+    {
+      "name": "Assert response status === 200",
+      "status": "failed",
+      "stage": "finished",
+      "start": 1700000000500,
+      "stop": 1700000001000,
+      "statusDetails": {
+        "message": "AssertionError: Expected status 200 but got 401",
+        "trace": "AssertionError: Expected status 200 but got 401\n    at Context.<anonymous> (specs/auth.spec.ts:12:10)"
+      }
+    }
   ]
 }

@@ -10,8 +10,24 @@
   "stop": 1700000003500,
   "name": "New checkout flow renders correctly",
   "fullName": "checkout.spec.ts#New checkout flow renders correctly",
+  "description": "Skipped because the 'new-checkout' feature flag is off in this environment.",
+  "parameters": [
+    { "name": "flag", "value": "new-checkout=off" }
+  ],
   "labels": [
     { "name": "suite", "value": "Checkout" },
     { "name": "severity", "value": "normal" }
+  ],
+  "steps": [
+    {
+      "name": "Check feature flag 'new-checkout'",
+      "status": "skipped",
+      "stage": "pending",
+      "start": 1700000003500,
+      "stop": 1700000003500,
+      "statusDetails": {
+        "message": "Flag is 'off' — skipping remaining steps"
+      }
+    }
   ]
 }

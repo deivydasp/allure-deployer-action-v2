@@ -11,8 +11,41 @@
   "stop": 1700000003000,
   "name": "Validate payment completion status",
   "fullName": "payment.spec.ts#Validate payment completion status",
+  "description": "End-to-end payment flow: create a payment, wait for processor callback, verify status.",
+  "parameters": [
+    { "name": "amount", "value": "42.00" },
+    { "name": "currency", "value": "EUR" }
+  ],
   "labels": [
     { "name": "suite", "value": "Payments" },
-    { "name": "severity", "value": "critical" }
+    { "name": "severity", "value": "critical" },
+    { "name": "feature", "value": "Checkout" }
+  ],
+  "steps": [
+    {
+      "name": "Create payment via POST /payments",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000001000,
+      "stop": 1700000001400
+    },
+    {
+      "name": "Wait for processor callback (up to 1500ms)",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000001400,
+      "stop": 1700000002600
+    },
+    {
+      "name": "Assert payment status === 'completed'",
+      "status": "failed",
+      "stage": "finished",
+      "start": 1700000002600,
+      "stop": 1700000003000,
+      "statusDetails": {
+        "message": "AssertionError: Expected payment status to be 'completed' but got 'pending'",
+        "trace": "AssertionError: Expected payment status to be 'completed' but got 'pending'\n    at Context.<anonymous> (specs/payment.spec.ts:42:10)"
+      }
+    }
   ]
 }

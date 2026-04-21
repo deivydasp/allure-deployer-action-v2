@@ -8,8 +8,68 @@
   "stop": 1700000002000,
   "name": "User login with valid credentials",
   "fullName": "auth.spec.ts#User login with valid credentials",
+  "description": "Verifies that a user with valid credentials can successfully log in and is redirected to the dashboard.",
+  "parameters": [
+    { "name": "environment", "value": "staging" },
+    { "name": "browser", "value": "chromium" }
+  ],
   "labels": [
     { "name": "suite", "value": "Authentication" },
-    { "name": "severity", "value": "critical" }
+    { "name": "severity", "value": "critical" },
+    { "name": "feature", "value": "Login" },
+    { "name": "story", "value": "Successful Login" }
+  ],
+  "steps": [
+    {
+      "name": "Navigate to login page",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000000,
+      "stop": 1700000000400
+    },
+    {
+      "name": "Enter username 'alice@example.com'",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000400,
+      "stop": 1700000000700
+    },
+    {
+      "name": "Enter valid password",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000700,
+      "stop": 1700000000900
+    },
+    {
+      "name": "Click 'Sign in' button",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000000900,
+      "stop": 1700000001200
+    },
+    {
+      "name": "Verify redirected to dashboard",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000001200,
+      "stop": 1700000001800,
+      "steps": [
+        {
+          "name": "URL contains '/dashboard'",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000001200,
+          "stop": 1700000001400
+        },
+        {
+          "name": "Welcome banner is visible",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000001400,
+          "stop": 1700000001800
+        }
+      ]
+    }
   ]
 }

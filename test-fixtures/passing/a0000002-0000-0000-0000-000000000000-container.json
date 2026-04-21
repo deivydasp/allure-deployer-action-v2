@@ -1,0 +1,61 @@
+{
+  "uuid": "a0000002-0000-0000-0000-000000000000",
+  "name": "Passing suite setup / teardown",
+  "children": [
+    "a0000001-0000-0000-0000-000000000001",
+    "a0000001-0000-0000-0000-000000000002",
+    "a0000001-0000-0000-0000-000000000003"
+  ],
+  "befores": [
+    {
+      "name": "Set up test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1699999999500,
+      "stop": 1699999999900,
+      "steps": [
+        {
+          "name": "Start test server on port 4000",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999500,
+          "stop": 1699999999700
+        },
+        {
+          "name": "Seed database with fixture users",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999700,
+          "stop": 1699999999900
+        }
+      ]
+    }
+  ],
+  "afters": [
+    {
+      "name": "Tear down test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000004000,
+      "stop": 1700000004300,
+      "steps": [
+        {
+          "name": "Close browser sessions",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000004000,
+          "stop": 1700000004150
+        },
+        {
+          "name": "Stop test server and clean database",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000004150,
+          "stop": 1700000004300
+        }
+      ]
+    }
+  ],
+  "start": 1699999999500,
+  "stop": 1700000004300
+}

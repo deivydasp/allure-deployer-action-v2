@@ -10,8 +10,28 @@
   "stop": 1700000004000,
   "name": "Network retry logic handles timeout",
   "fullName": "network.spec.ts#Network retry logic handles timeout",
+  "description": "Test runner lost connection mid-execution — outcome is indeterminate.",
   "labels": [
     { "name": "suite", "value": "Network" },
     { "name": "severity", "value": "normal" }
+  ],
+  "steps": [
+    {
+      "name": "Start network listener",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003500,
+      "stop": 1700000003700
+    },
+    {
+      "name": "Simulate timeout after 5s",
+      "status": "unknown",
+      "stage": "finished",
+      "start": 1700000003700,
+      "stop": 1700000004000,
+      "statusDetails": {
+        "message": "Test result could not be determined"
+      }
+    }
   ]
 }

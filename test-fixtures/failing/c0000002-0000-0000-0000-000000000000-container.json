@@ -1,0 +1,60 @@
+{
+  "uuid": "c0000002-0000-0000-0000-000000000000",
+  "name": "Failing suite setup / teardown",
+  "children": [
+    "c0000001-0000-0000-0000-000000000001",
+    "c0000001-0000-0000-0000-000000000002"
+  ],
+  "befores": [
+    {
+      "name": "Set up test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1699999999500,
+      "stop": 1699999999900,
+      "steps": [
+        {
+          "name": "Launch browser (chromium, headless)",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999500,
+          "stop": 1699999999750
+        },
+        {
+          "name": "Prepare mock auth server",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1699999999750,
+          "stop": 1699999999900
+        }
+      ]
+    }
+  ],
+  "afters": [
+    {
+      "name": "Tear down test environment",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000002500,
+      "stop": 1700000002800,
+      "steps": [
+        {
+          "name": "Capture failure screenshots",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000002500,
+          "stop": 1700000002650
+        },
+        {
+          "name": "Shut down browser",
+          "status": "passed",
+          "stage": "finished",
+          "start": 1700000002650,
+          "stop": 1700000002800
+        }
+      ]
+    }
+  ],
+  "start": 1699999999500,
+  "stop": 1700000002800
+}

@@ -8,8 +8,33 @@
   "stop": 1700000004000,
   "name": "User logout",
   "fullName": "auth.spec.ts#User logout",
+  "description": "Verifies that the logout button ends the session and returns the user to the login page.",
   "labels": [
     { "name": "suite", "value": "Authentication" },
-    { "name": "severity", "value": "minor" }
+    { "name": "severity", "value": "minor" },
+    { "name": "feature", "value": "Logout" }
+  ],
+  "steps": [
+    {
+      "name": "Open user menu",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003500,
+      "stop": 1700000003650
+    },
+    {
+      "name": "Click 'Logout'",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003650,
+      "stop": 1700000003800
+    },
+    {
+      "name": "Verify redirected to /login",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1700000003800,
+      "stop": 1700000004000
+    }
   ]
 }
