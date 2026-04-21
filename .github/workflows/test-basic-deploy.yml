@@ -50,13 +50,13 @@ jobs:
           test -n "$REPORT_DIR"                       && echo "OK: report dir $REPORT_DIR" || { echo "FAIL: no report directory"; exit 1; }
           test -f "$REPORT_DIR/index.html"            && echo "OK: report index.html"  || { echo "FAIL: report index.html missing"; exit 1; }
           test -f "$REPORT_DIR/deploy.json"           && echo "OK: deploy.json"        || { echo "FAIL: deploy.json missing"; exit 1; }
-          # Report must contain test case data for the SPA to render individual tests
-          TEST_CASE_COUNT=$(ls "$REPORT_DIR/data/test-cases/" 2>/dev/null | wc -l)
+          # Report must contain test-result data for the SPA to render individual tests
+          TEST_CASE_COUNT=$(ls "$REPORT_DIR/data/test-results/" 2>/dev/null | wc -l)
           test "$TEST_CASE_COUNT" -gt 0 \
-            && echo "OK: $TEST_CASE_COUNT test-case JSON file(s) present" \
-            || { echo "FAIL: no test-case JSON files — SPA would not render any tests"; exit 1; }
-          # Save a test case ID for the SPA smoke test
-          TEST_CASE_ID=$(ls "$REPORT_DIR/data/test-cases/" | head -1 | sed 's/\.json$//')
+            && echo "OK: $TEST_CASE_COUNT test-result JSON file(s) present" \
+            || { echo "FAIL: no test-result JSON files — SPA would not render any tests"; exit 1; }
+          # Save a test-result ID for the SPA smoke test
+          TEST_CASE_ID=$(ls "$REPORT_DIR/data/test-results/" | head -1 | sed 's/\.json$//')
           echo "TEST_CASE_ID=$TEST_CASE_ID" >> $GITHUB_ENV
           echo "REPORT_URL=${{ steps.deploy.outputs.report_url }}" >> $GITHUB_ENV
           echo "=== All filesystem checks passed ==="
