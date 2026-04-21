@@ -50,4 +50,16 @@ jobs:
           test -n "$REPORT_DIR"                       && echo "OK: report dir $REPORT_DIR" || { echo "FAIL: no report directory"; exit 1; }
           test -f "$REPORT_DIR/index.html"            && echo "OK: report index.html"  || { echo "FAIL: report index.html missing"; exit 1; }
           test -f "$REPORT_DIR/deploy.json"           && echo "OK: deploy.json"        || { echo "FAIL: deploy.json missing"; exit 1; }
+          echo "=== Checking SPA data files (catches allure regressions) ==="
+          # widgets/allure_environment.json: awesome SPA fetches this when opening individual test results
+          # If missing, the SPA crashes with "Cannot read properties of undefined (reading 'message')"
+          # (allure 3.4+ stopped generating this when no environment.properties is provided)
+          test -f "$REPORT_DIR/widgets/allure_environment.json" \
+            && echo "OK: widgets/allure_environment.json" \
+            || { echo "FAIL: widgets/allure_environment.json missing — individual test views would crash"; exit 1; }
+          # Report must contain test case data for the SPA to render individual tests
+          TEST_CASE_COUNT=$(ls "$REPORT_DIR/data/test-cases/" 2>/dev/null | wc -l)
+          test "$TEST_CASE_COUNT" -gt 0 \
+            && echo "OK: $TEST_CASE_COUNT test-case JSON file(s) present" \
+            || { echo "FAIL: no test-case JSON files — SPA would not render any tests"; exit 1; }
           echo "=== All checks passed ==="

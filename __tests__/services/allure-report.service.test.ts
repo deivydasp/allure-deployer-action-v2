@@ -207,6 +207,80 @@ describe('Allure', () => {
             );
             expect(redirectCall).toBeUndefined();
         });
+
+        it('creates widgets/allure_environment.json in both roots when missing', async () => {
+            const runner = createMockRunner();
+            mockedReadFile.mockResolvedValueOnce('');
+            // stat returns ENOENT for both candidate paths — neither exists
+            mockedStat.mockRejectedValue(new Error('ENOENT'));
+
+            const allure = new Allure({
+                allureRunner: runner,
+                config: createConfig({ showHistory: false }),
+            });
+
+            await allure.generate();
+
+            const rootWidget = mockedWriteFile.mock.calls.find(
+                (call) => typeof call[0] === 'string'
+                    && call[0].includes('widgets')
+                    && call[0].includes('allure_environment.json')
+                    && !call[0].includes('awesome'),
+            );
+            const awesomeWidget = mockedWriteFile.mock.calls.find(
+                (call) => typeof call[0] === 'string'
+                    && call[0].includes('awesome')
+                    && call[0].includes('widgets')
+                    && call[0].includes('allure_environment.json'),
+            );
+
+            expect(rootWidget).toBeDefined();
+            expect(rootWidget![1]).toBe('[]');
+            expect(awesomeWidget).toBeDefined();
+            expect(awesomeWidget![1]).toBe('[]');
+        });
+
+        it('does not overwrite existing allure_environment.json', async () => {
+            const runner = createMockRunner();
+            mockedReadFile.mockResolvedValueOnce('');
+            // stat resolves for both candidates — both exist already
+            mockedStat.mockResolvedValue({ isDirectory: () => false } as any);
+
+            const allure = new Allure({
+                allureRunner: runner,
+                config: createConfig({ showHistory: false }),
+            });
+
+            await allure.generate();
+
+            const widgetWrites = mockedWriteFile.mock.calls.filter(
+                (call) => typeof call[0] === 'string' && call[0].includes('allure_environment.json'),
+            );
+            expect(widgetWrites).toHaveLength(0);
+        });
+
+        it('warns but continues when environment widget write fails', async () => {
+            const runner = createMockRunner();
+            mockedReadFile.mockResolvedValueOnce('');
+            mockedStat.mockRejectedValue(new Error('ENOENT'));
+            // Make the widget writeFile calls reject
+            mockedWriteFile.mockImplementation(async (path: any) => {
+                if (typeof path === 'string' && path.includes('allure_environment.json')) {
+                    throw new Error('disk full');
+                }
+                return undefined;
+            });
+
+            const allure = new Allure({
+                allureRunner: runner,
+                config: createConfig({ showHistory: false }),
+            });
+
+            await expect(allure.generate()).resolves.toBe('/reports');
+            expect(mockedWarning).toHaveBeenCalledWith(
+                expect.stringContaining('Failed to write environment widget'),
+            );
+        });
     });
 
     describe('readEnvironments', () => {

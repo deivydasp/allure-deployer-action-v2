@@ -38909,6 +38909,7 @@ class Allure {
         if (exitCode !== 0) {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
+        await this.ensureEnvironmentWidget();
         if (this.config.showHistory) {
             await this.postProcessHistory(executor?.reportUrl);
             if (executor?.reportUrl) {
@@ -38987,6 +38988,33 @@ class Allure {
         }
         catch (e) {
             warning(`Failed to create history redirect: ${e}`);
+        }
+    }
+    /**
+     * Ensures widgets/allure_environment.json exists in both the report root and
+     * the awesome/ subdirectory. The Allure 3 awesome theme fetches this file when
+     * opening individual test results — a 404 crashes the SPA with an undefined
+     * read on `.message`. Writing an empty array makes missing environment data
+     * non-fatal.
+     */
+    async ensureEnvironmentWidget() {
+        const candidates = [
+            (0,external_node_path_namespaceObject.join)(this.config.REPORTS_DIR, 'widgets', 'allure_environment.json'),
+            (0,external_node_path_namespaceObject.join)(this.config.REPORTS_DIR, 'awesome', 'widgets', 'allure_environment.json'),
+        ];
+        for (const filePath of candidates) {
+            try {
+                await (0,promises_namespaceObject.stat)(filePath);
+            }
+            catch {
+                try {
+                    await (0,promises_namespaceObject.mkdir)((0,external_node_path_namespaceObject.dirname)(filePath), { recursive: true });
+                    await (0,promises_namespaceObject.writeFile)(filePath, '[]', 'utf8');
+                }
+                catch (e) {
+                    warning(`Failed to write environment widget at ${filePath}: ${e}`);
+                }
+            }
         }
     }
 }
