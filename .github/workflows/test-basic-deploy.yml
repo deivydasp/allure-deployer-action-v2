@@ -62,11 +62,17 @@ jobs:
           echo "=== All filesystem checks passed ==="
 
       - name: Install Playwright
-        run: npx --yes playwright@1.49 install --with-deps chromium
+        run: |
+          mkdir -p /tmp/playwright-check
+          cd /tmp/playwright-check
+          npm init -y >/dev/null
+          npm install --silent playwright@1.49
+          npx playwright install --with-deps chromium
 
       - name: SPA smoke test — open an individual test result
+        working-directory: /tmp/playwright-check
         run: |
-          cat > /tmp/spa-check.mjs <<'SCRIPT'
+          cat > spa-check.mjs <<'SCRIPT'
           import { chromium } from 'playwright';
           const url = `${process.env.REPORT_URL}#${process.env.TEST_CASE_ID}`;
           console.log(`Opening: ${url}`);
@@ -93,4 +99,4 @@ jobs:
           }
           console.log(`OK: individual test result renders without errors (${errors.length} non-fatal console messages)`);
           SCRIPT
-          node /tmp/spa-check.mjs
+          node spa-check.mjs
