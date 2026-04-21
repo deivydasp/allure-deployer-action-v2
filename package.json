@@ -15,7 +15,7 @@
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "lint": "eslint src/",
-    "build": "rm -rf ./dist && tsc -p tsconfig.json && ncc build dist/index.js -o dist/main -e allure -e @allurereport/summary && ncc build dist/utilities/cleanup.js -o dist/cleanup && node scripts/patch-dist-package.js && cd dist/main && npm install allure@^3.6.0 --omit=dev --silent",
+    "build": "rm -rf ./dist && tsc -p tsconfig.json && ncc build dist/index.js -o dist/main -e allure -e @allurereport/summary && ncc build dist/utilities/cleanup.js -o dist/cleanup && node scripts/patch-dist-package.js && cd dist/main && npm install allure@~3.3.1 --omit=dev --silent",
     "build:watch": "tsc --watch",
     "test": "npx vitest run",
     "test:watch": "npx vitest"
@@ -25,7 +25,7 @@
     "@actions/core": "^3.0.0",
     "@actions/github": "^9.1.0",
     "@octokit/request-error": "^7.1.0",
-    "allure": "^3.6.0",
+    "allure": "~3.3.1",
     "normalize-url": "^9.0.0",
     "p-limit": "^7.3.0",
     "properties-reader": "^3.0.1",

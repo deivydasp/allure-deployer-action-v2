@@ -1,5 +1,5 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { info, warning } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
 import { CommandRunner } from '../interfaces/command.interface.js';
@@ -66,8 +66,6 @@ export class Allure {
         if (exitCode !== 0) {
             throw new Error(`Failed to generate Allure report (exit code ${exitCode}): ${stderr}`);
         }
-
-        await this.ensureEnvironmentWidget();
 
         if (this.config.showHistory) {
             await this.postProcessHistory(executor?.reportUrl);
@@ -151,32 +149,6 @@ export class Allure {
             await writeFile(join(awesomeDir, 'index.html'), html, 'utf8');
         } catch (e) {
             warning(`Failed to create history redirect: ${e}`);
-        }
-    }
-
-    /**
-     * Ensures widgets/allure_environment.json exists in both the report root and
-     * the awesome/ subdirectory. The Allure 3 awesome theme fetches this file when
-     * opening individual test results — a 404 crashes the SPA with an undefined
-     * read on `.message`. Writing an empty array makes missing environment data
-     * non-fatal.
-     */
-    private async ensureEnvironmentWidget(): Promise<void> {
-        const candidates = [
-            join(this.config.REPORTS_DIR, 'widgets', 'allure_environment.json'),
-            join(this.config.REPORTS_DIR, 'awesome', 'widgets', 'allure_environment.json'),
-        ];
-        for (const filePath of candidates) {
-            try {
-                await stat(filePath);
-            } catch {
-                try {
-                    await mkdir(dirname(filePath), { recursive: true });
-                    await writeFile(filePath, '[]', 'utf8');
-                } catch (e) {
-                    warning(`Failed to write environment widget at ${filePath}: ${e}`);
-                }
-            }
         }
     }
 }

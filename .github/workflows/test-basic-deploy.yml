@@ -45,21 +45,52 @@ jobs:
           test -f test-basic/index.html               && echo "OK: redirect page"      || { echo "FAIL: redirect page missing"; exit 1; }
           test -f test-basic/_latest                  && echo "OK: _latest"            || { echo "FAIL: _latest missing"; exit 1; }
           test -f test-basic/history/history.jsonl    && echo "OK: history.jsonl"      || { echo "FAIL: history.jsonl missing"; exit 1; }
-          # Verify a report directory exists (numeric timestamp)
-          REPORT_DIR=$(ls -d test-basic/[0-9]* 2>/dev/null | head -1)
+          # Verify the newest report directory (highest numeric timestamp)
+          REPORT_DIR=$(ls -d test-basic/[0-9]* 2>/dev/null | sort -n | tail -1)
           test -n "$REPORT_DIR"                       && echo "OK: report dir $REPORT_DIR" || { echo "FAIL: no report directory"; exit 1; }
           test -f "$REPORT_DIR/index.html"            && echo "OK: report index.html"  || { echo "FAIL: report index.html missing"; exit 1; }
           test -f "$REPORT_DIR/deploy.json"           && echo "OK: deploy.json"        || { echo "FAIL: deploy.json missing"; exit 1; }
-          echo "=== Checking SPA data files (catches allure regressions) ==="
-          # widgets/allure_environment.json: awesome SPA fetches this when opening individual test results
-          # If missing, the SPA crashes with "Cannot read properties of undefined (reading 'message')"
-          # (allure 3.4+ stopped generating this when no environment.properties is provided)
-          test -f "$REPORT_DIR/widgets/allure_environment.json" \
-            && echo "OK: widgets/allure_environment.json" \
-            || { echo "FAIL: widgets/allure_environment.json missing — individual test views would crash"; exit 1; }
           # Report must contain test case data for the SPA to render individual tests
           TEST_CASE_COUNT=$(ls "$REPORT_DIR/data/test-cases/" 2>/dev/null | wc -l)
           test "$TEST_CASE_COUNT" -gt 0 \
             && echo "OK: $TEST_CASE_COUNT test-case JSON file(s) present" \
             || { echo "FAIL: no test-case JSON files — SPA would not render any tests"; exit 1; }
-          echo "=== All checks passed ==="
+          # Save a test case ID for the SPA smoke test
+          TEST_CASE_ID=$(ls "$REPORT_DIR/data/test-cases/" | head -1 | sed 's/\.json$//')
+          echo "TEST_CASE_ID=$TEST_CASE_ID" >> $GITHUB_ENV
+          echo "REPORT_URL=${{ steps.deploy.outputs.report_url }}" >> $GITHUB_ENV
+          echo "=== All filesystem checks passed ==="
+
+      - name: Install Playwright
+        run: npx --yes playwright@1.49 install --with-deps chromium
+
+      - name: SPA smoke test — open an individual test result
+        run: |
+          cat > /tmp/spa-check.mjs <<'SCRIPT'
+          import { chromium } from 'playwright';
+          const url = `${process.env.REPORT_URL}#${process.env.TEST_CASE_ID}`;
+          console.log(`Opening: ${url}`);
+          const browser = await chromium.launch();
+          const context = await browser.newContext();
+          const page = await context.newPage();
+          const errors = [];
+          page.on('pageerror', (err) => errors.push(String(err)));
+          page.on('console', (msg) => {
+            if (msg.type() === 'error') errors.push(msg.text());
+          });
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+          // Give the SPA 3s to finish hydrating the test-result view
+          await page.waitForTimeout(3000);
+          await browser.close();
+          const fatal = errors.filter((e) =>
+            /Cannot read properties of undefined.*(message|payload)/i.test(e)
+            || /TypeError.*undefined/i.test(e)
+          );
+          if (fatal.length > 0) {
+            console.error('SPA errors detected:');
+            for (const e of fatal) console.error(' - ' + e);
+            process.exit(1);
+          }
+          console.log(`OK: individual test result renders without errors (${errors.length} non-fatal console messages)`);
+          SCRIPT
+          node /tmp/spa-check.mjs
