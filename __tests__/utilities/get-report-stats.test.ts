@@ -86,20 +86,6 @@ describe('getReportStats', () => {
         expect(result.duration).toBe(5000);
     });
 
-    it('reads stats from summary.json (v2 format with statistic field)', async () => {
-        mockedReadFile.mockResolvedValueOnce(
-            JSON.stringify({
-                statistic: { passed: 5, failed: 1, broken: 0, skipped: 2, unknown: 0 },
-                duration: 3000,
-            }),
-        );
-
-        const result = await getReportStats('/report');
-        expect(result.statistic).toEqual({
-            passed: 5, failed: 1, broken: 0, skipped: 2, unknown: 0,
-        });
-    });
-
     it('falls back to awesome/summary.json', async () => {
         mockedReadFile
             .mockRejectedValueOnce(new Error('ENOENT')) // summary.json fails

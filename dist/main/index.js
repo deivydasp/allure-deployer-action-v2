@@ -44661,10 +44661,6 @@ class GithubPagesService {
                         const summaryPath = (0,external_node_path_namespaceObject.join)(latestDir, candidate);
                         if ((0,external_node_fs_namespaceObject.existsSync)(summaryPath)) {
                             const summary = JSON.parse(await (0,promises_namespaceObject.readFile)(summaryPath, 'utf8'));
-                            // Normalize Allure v2 format (statistic) to v3 format (stats)
-                            if (!summary.stats && summary.statistic) {
-                                summary.stats = summary.statistic;
-                            }
                             summary.name = summary.name ?? entry.name;
                             summary.href = `${entry.name}/`;
                             summaries.push(summary);
@@ -44975,7 +44971,7 @@ async function getReportStats(reportDir) {
     for (const summaryPath of summaryCandidates) {
         try {
             const summary = await readJsonFile(summaryPath);
-            const stats = summary.stats ?? summary.statistic;
+            const stats = summary.stats;
             if (stats) {
                 return {
                     statistic: {
@@ -45397,7 +45393,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     const summary = await readSummaryFromDir((0,external_node_path_namespaceObject.join)(prefixDir, primaryDir));
     if (!summary)
         return undefined;
-    const summaryStats = summary.stats ?? summary.statistic;
+    const summaryStats = summary.stats;
     if (!summaryStats)
         return undefined;
     // Each non-attempt-1 deploy goes into a rerun column keyed by its GitHub runAttempt.

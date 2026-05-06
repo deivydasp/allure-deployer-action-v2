@@ -146,7 +146,7 @@ scripts/
 - **`src/services/github-pages.service.ts`** — The most complex file. Implements `HostingProvider` directly. Handles git clone (shallow, depth=1), branch creation (uses `git ls-remote --symref HEAD` to discover default branch), old report cleanup (filters by numeric timestamp directory name, accounts for incoming report in `keep` count), redirect page (dynamic — writes target URL to `_latest` file, redirect page fetches it with cache-busting so even a cached page always resolves the current report), root summary page (via `@allurereport/summary`), and commit+push with retry (5 attempts). On concurrent push conflicts, lazily backs up the report, resets to remote, restores and re-applies all changes cleanly.
 - **`src/services/allure-report.service.ts`** — Generates `allurerc.json` config, runs `allure generate`, post-processes history (URL patching, truncation), creates history redirect for single-plugin reports.
 - **`src/services/allure.service.ts`** — Resolves the allure CLI binary path from the `allure` package and spawns it as a child process.
-- **`src/utilities/get-report-stats.ts`** — Reads report statistics from `summary.json` (supporting both `stats` and `statistic` fields for v2/v3 compat), falling back to `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin).
+- **`src/utilities/get-report-stats.ts`** — Reads report statistics from `summary.json`, falling back to `widgets/statistic.json` (single-plugin) or `awesome/widgets/statistic.json` (multi-plugin) when `summary.json` is unavailable.
 
 ## Key Patterns
 

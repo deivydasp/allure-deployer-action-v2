@@ -434,7 +434,7 @@ async function scanSinglePrefix(
     const summary = await readSummaryFromDir(join(prefixDir, primaryDir));
     if (!summary) return undefined;
 
-    const summaryStats = summary.stats ?? summary.statistic;
+    const summaryStats = summary.stats;
     if (!summaryStats) return undefined;
 
     // Each non-attempt-1 deploy goes into a rerun column keyed by its GitHub runAttempt.
@@ -504,7 +504,6 @@ async function findDeployMetasForRun(
 interface SummaryJson {
     name?: string;
     stats?: ReportStatistic;
-    statistic?: ReportStatistic;
 }
 
 /** Reads summary.json from a specific report directory (tries both single/multi-plugin paths). */

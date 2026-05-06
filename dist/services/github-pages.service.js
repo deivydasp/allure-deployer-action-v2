@@ -145,10 +145,6 @@ export class GithubPagesService {
                         const summaryPath = join(latestDir, candidate);
                         if (existsSync(summaryPath)) {
                             const summary = JSON.parse(await readFile(summaryPath, 'utf8'));
-                            // Normalize Allure v2 format (statistic) to v3 format (stats)
-                            if (!summary.stats && summary.statistic) {
-                                summary.stats = summary.statistic;
-                            }
                             summary.name = summary.name ?? entry.name;
                             summary.href = `${entry.name}/`;
                             summaries.push(summary);

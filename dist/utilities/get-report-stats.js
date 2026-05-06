@@ -47,7 +47,7 @@ export async function getReportStats(reportDir) {
     for (const summaryPath of summaryCandidates) {
         try {
             const summary = await readJsonFile(summaryPath);
-            const stats = summary.stats ?? summary.statistic;
+            const stats = summary.stats;
             if (stats) {
                 return {
                     statistic: {

@@ -353,7 +353,7 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     const summary = await readSummaryFromDir(join(prefixDir, primaryDir));
     if (!summary)
         return undefined;
-    const summaryStats = summary.stats ?? summary.statistic;
+    const summaryStats = summary.stats;
     if (!summaryStats)
         return undefined;
     // Each non-attempt-1 deploy goes into a rerun column keyed by its GitHub runAttempt.
