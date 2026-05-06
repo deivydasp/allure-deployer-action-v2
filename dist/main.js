@@ -356,24 +356,28 @@ async function scanSinglePrefix(prefixDir, dirName, pagesUrl, pagesSourcePath) {
     const summaryStats = summary.stats ?? summary.statistic;
     if (!summaryStats)
         return undefined;
-    // Build rerun links
+    // Each non-attempt-1 deploy goes into a rerun column keyed by its GitHub runAttempt.
+    // Column #N matches runAttempt = N+1, so a prefix that ran on attempt 2 lands in Rerun #1
+    // even if its attempt-1 deploy is missing.
     const reruns = [];
-    if (deployMetas.length > 1) {
-        for (let i = 1; i < deployMetas.length; i++) {
-            const rerunDir = join(pagesSourcePath, dirName, deployMetas[i].dir);
-            reruns.push({
-                attempt: deployMetas[i].meta.runAttempt,
-                url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
-            });
-        }
+    for (const meta of deployMetas) {
+        if (meta.meta.runAttempt === 1)
+            continue;
+        const rerunDir = join(pagesSourcePath, dirName, meta.dir);
+        reruns.push({
+            attempt: meta.meta.runAttempt,
+            url: normalizeUrl(`${pagesUrl}/${rerunDir}`),
+        });
     }
-    // Use first attempt as Report link when reruns exist, otherwise latest
-    const reportDir = deployMetas.length > 1
-        ? join(pagesSourcePath, dirName, deployMetas[0].dir)
-        : join(pagesSourcePath, dirName, primaryDir);
+    // "Original" links to the attempt-1 deploy if it exists; otherwise leave undefined
+    // so the column renders as "—" (the prefix's first deploy in this run was a rerun).
+    const att1 = deployMetas.find((m) => m.meta.runAttempt === 1);
+    const reportUrl = att1
+        ? normalizeUrl(`${pagesUrl}/${join(pagesSourcePath, dirName, att1.dir)}`)
+        : undefined;
     return {
         reportName: summary.name ?? dirName,
-        reportUrl: normalizeUrl(`${pagesUrl}/${reportDir}`),
+        reportUrl,
         stats: {
             passed: summaryStats.passed ?? 0,
             broken: summaryStats.broken ?? 0,

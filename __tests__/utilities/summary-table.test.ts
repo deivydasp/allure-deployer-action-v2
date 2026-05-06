@@ -121,8 +121,34 @@ describe('buildSummaryTable', () => {
             { reportName: 'Tests', stats: baseStats },
         ];
         const table = buildSummaryTable(rows);
-        // No <a href> in the report column
+        // The "Original/Report" cell renders "—" when reportUrl is missing
         expect(table).not.toContain('<a href="">');
+        const lines = table.split('\n');
+        const dataRow = lines.find((l) => l.includes('Tests'));
+        // Cell layout: | pie | name | duration | stats | total | reportCol |
+        const cells = dataRow!.split('|').map((c) => c.trim());
+        expect(cells[6]).toBe('—');
+    });
+
+    it('renders Original as dash when prefix first deployed on a rerun', () => {
+        // Scenario: a prefix that didn't run on attempt 1 but only on attempt 2.
+        // reportUrl is undefined → "Original" column shows —
+        // reruns has the attempt-2 deploy → "Rerun #1" column shows the View link
+        const rows: SummaryRow[] = [
+            {
+                reportName: 'Late starter',
+                stats: baseStats,
+                reportUrl: undefined,
+                reruns: [{ attempt: 2, url: 'https://example.com/late-att2' }],
+            },
+        ];
+        const table = buildSummaryTable(rows);
+        const lines = table.split('\n');
+        const dataRow = lines.find((l) => l.includes('Late starter'))!;
+        const cells = dataRow.split('|').map((c) => c.trim());
+        // | pie | name | duration | stats | total | original | rerun#1 |
+        expect(cells[6]).toBe('—');
+        expect(cells[7]).toContain('href="https://example.com/late-att2"');
     });
 
     it('handles rerun columns for notDeployed rows', () => {

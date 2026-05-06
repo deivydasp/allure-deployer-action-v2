@@ -34,11 +34,13 @@ function buildRow(row, maxReruns) {
         .filter(Boolean)
         .join('&nbsp;&nbsp;&nbsp;');
     const duration = row.duration ? formatDuration(row.duration) : '';
+    // "Original" column links to the attempt-1 deploy. Empty when this prefix
+    // has no attempt-1 deploy (e.g. it first ran on a rerun).
     const reportCol = row.reportUrl
         ? `<a href="${row.reportUrl}">View</a>`
-        : '';
+        : '—';
     let result = `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total} | ${reportCol}`;
-    // Add rerun columns
+    // Rerun columns are absolute by GitHub runAttempt: column #N matches runAttempt = N+1
     for (let i = 1; i <= maxReruns; i++) {
         const rerun = row.reruns?.find((r) => r.attempt === i + 1);
         result += ` | ${rerun ? `<a href="${rerun.url}">View</a>` : '—'}`;
@@ -48,7 +50,7 @@ function buildRow(row, maxReruns) {
 export function buildSummaryTable(rows) {
     // Find the highest rerun attempt across all rows (attempt 2 = Rerun #1, attempt 3 = Rerun #2, etc.)
     const maxAttempt = Math.max(1, ...rows.flatMap((r) => r.reruns?.map((rr) => rr.attempt) ?? [1]));
-    const rerunCount = maxAttempt - 1; // attempt 1 is the original, reruns start at attempt 2
+    const rerunCount = maxAttempt - 1;
     const reportLabel = rerunCount > 0 ? 'Original' : 'Report';
     let header = `| | Name | Duration | Stats | Total | ${reportLabel}`;
     let separator = `|-|-|-|-|-|-`;
