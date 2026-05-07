@@ -10,10 +10,12 @@ function formatDuration(ms) {
     const h = Math.floor(m / 60);
     return `${h}h ${m % 60}m`;
 }
-function buildRow(row, maxReruns) {
+function buildRow(row, showFirstColumn, rerunAttempts) {
     if (row.notDeployed || !row.stats) {
-        let result = `| — | **${row.reportName}** | — | <em>Not deployed in this run</em> | — | —`;
-        for (let i = 1; i <= maxReruns; i++) {
+        let result = `| — | **${row.reportName}** | — | <em>Not deployed in this run</em> | —`;
+        if (showFirstColumn)
+            result += ` | —`;
+        for (let i = 0; i < rerunAttempts.length; i++) {
             result += ` | —`;
         }
         return `${result} |`;
@@ -34,32 +36,51 @@ function buildRow(row, maxReruns) {
         .filter(Boolean)
         .join('&nbsp;&nbsp;&nbsp;');
     const duration = row.duration ? formatDuration(row.duration) : '';
-    // "Original" column links to the attempt-1 deploy. Empty when this prefix
-    // has no attempt-1 deploy (e.g. it first ran on a rerun).
-    const reportCol = row.reportUrl
-        ? `<a href="${row.reportUrl}">View</a>`
-        : '—';
-    let result = `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total} | ${reportCol}`;
-    // Rerun columns are absolute by GitHub runAttempt: column #N matches runAttempt = N+1
-    for (let i = 1; i <= maxReruns; i++) {
-        const rerun = row.reruns?.find((r) => r.attempt === i + 1);
+    let result = `| ${pie} | **${row.reportName}** | ${duration} | ${stats} | ${total}`;
+    if (showFirstColumn) {
+        // "Original" column links to the attempt-1 deploy. Empty when this prefix
+        // has no attempt-1 deploy (e.g. it first ran on a rerun).
+        const reportCol = row.reportUrl ? `<a href="${row.reportUrl}">View</a>` : '—';
+        result += ` | ${reportCol}`;
+    }
+    // Rerun columns are absolute by GitHub runAttempt: column "Rerun #(N-1)" matches runAttempt = N.
+    // Only attempts that produced at least one deploy across all rows are shown.
+    for (const attempt of rerunAttempts) {
+        const rerun = row.reruns?.find((r) => r.attempt === attempt);
         result += ` | ${rerun ? `<a href="${rerun.url}">View</a>` : '—'}`;
     }
     return `${result} |`;
 }
 export function buildSummaryTable(rows) {
-    // Find the highest rerun attempt across all rows (attempt 2 = Rerun #1, attempt 3 = Rerun #2, etc.)
-    const maxAttempt = Math.max(1, ...rows.flatMap((r) => r.reruns?.map((rr) => rr.attempt) ?? [1]));
-    const rerunCount = maxAttempt - 1;
-    const reportLabel = rerunCount > 0 ? 'Original' : 'Report';
-    let header = `| | Name | Duration | Stats | Total | ${reportLabel}`;
-    let separator = `|-|-|-|-|-|-`;
-    for (let i = 1; i <= rerunCount; i++) {
-        header += ` | Rerun #${i}`;
+    // Collect unique rerun attempts that have at least one deploy across all rows.
+    // Empty leading/middle attempts (e.g. build-failure runs) collapse to nothing.
+    const rerunAttemptsSet = new Set();
+    for (const row of rows) {
+        for (const rerun of row.reruns ?? []) {
+            rerunAttemptsSet.add(rerun.attempt);
+        }
+    }
+    const rerunAttempts = [...rerunAttemptsSet].sort((a, b) => a - b);
+    // First column is shown when at least one row has an attempt-1 deploy. If no row has
+    // an attempt-1 deploy AND there are rerun columns, the first column would be all
+    // dashes — drop it. If there are no rerun columns either (e.g. all "Not deployed"),
+    // keep a "Report" column so the table still has a deploy slot.
+    const someHasAtt1 = rows.some((r) => !r.notDeployed && r.reportUrl);
+    const showFirstColumn = someHasAtt1 || rerunAttempts.length === 0;
+    let header = `| | Name | Duration | Stats | Total`;
+    let separator = `|-|-|-|-|-`;
+    if (showFirstColumn) {
+        const label = rerunAttempts.length > 0 ? 'Original' : 'Report';
+        header += ` | ${label}`;
+        separator += `|-`;
+    }
+    for (const attempt of rerunAttempts) {
+        // Column "Rerun #(N-1)" represents GitHub runAttempt = N
+        header += ` | Rerun #${attempt - 1}`;
         separator += `|-`;
     }
     header += ` |`;
     separator += `|`;
-    const tableRows = rows.map((r) => buildRow(r, rerunCount)).join('\n');
+    const tableRows = rows.map((r) => buildRow(r, showFirstColumn, rerunAttempts)).join('\n');
     return `${header}\n${separator}\n${tableRows}`;
 }
