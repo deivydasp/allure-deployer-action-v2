@@ -142,6 +142,23 @@ describe('Allure', () => {
             expect(config.plugins.awesome.options.reportLanguage).toBe('de');
         });
 
+        it('groups the report tree by suite labels', async () => {
+            const runner = createMockRunner();
+            mockedReadFile.mockResolvedValue('');
+            const allure = new Allure({
+                allureRunner: runner,
+                config: createConfig(),
+            });
+
+            await allure.generate();
+
+            const allurercCall = mockedWriteFile.mock.calls.find(
+                (call) => typeof call[0] === 'string' && call[0].includes('allurerc.json'),
+            );
+            const config = JSON.parse(allurercCall![1] as string);
+            expect(config.plugins.awesome.options.groupBy).toEqual(['parentSuite', 'suite']);
+        });
+
         it('post-processes history: patches URL and truncates', async () => {
             const runner = createMockRunner();
             const historyLines = [

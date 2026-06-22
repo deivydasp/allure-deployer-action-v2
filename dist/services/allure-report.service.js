@@ -66,6 +66,7 @@ export class Allure {
                 awesome: {
                     enabled: true,
                     options: {
+                        groupBy: ['parentSuite', 'suite'],
                         ...(this.config.reportLanguage && { reportLanguage: this.config.reportLanguage }),
                     },
                 },
