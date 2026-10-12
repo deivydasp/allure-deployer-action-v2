@@ -44708,12 +44708,18 @@ class GithubPagesService {
         }
         if (!parent)
             return;
-        await octokit.graphql(UPDATE_REF_MUTATION, {
-            repositoryId,
-            name: `refs/heads/${this.branch}`,
-            beforeOid: head,
-            afterOid: parent,
-        });
+        try {
+            await octokit.graphql(UPDATE_REF_MUTATION, {
+                repositoryId,
+                name: `refs/heads/${this.branch}`,
+                beforeOid: head,
+                afterOid: parent,
+            });
+        }
+        catch (error) {
+            // GitHub reports a beforeOid mismatch only as a generic "Something went wrong" error
+            throw new Error(`branch update rejected, most likely another deploy pushed after ${head.slice(0, 7)}: ${error}`);
+        }
         info(`Pruned commits older than ${cutoff.slice(0, 10)} from '${this.branch}', kept ${kept.length} (commit_retention_days: ${io.commit_retention_days})`);
     }
     /**
@@ -44935,7 +44941,7 @@ class GithubPagesService {
     async getDefaultBranch() {
         // Use ls-remote instead of symbolic-ref — symbolic-ref requires origin/HEAD
         // which isn't set after a targeted fetch (only after clone or remote set-head).
-        const lsRemote = await this.git.listRemote(['--symref', 'HEAD']);
+        const lsRemote = await this.git.listRemote(['--symref', 'origin', 'HEAD']);
         // Output format: "ref: refs/heads/main\tHEAD\n<sha>\tHEAD\n"
         const match = lsRemote.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD/m);
         if (!match?.[1]) {

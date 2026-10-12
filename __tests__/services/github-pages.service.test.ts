@@ -153,7 +153,7 @@ describe('GithubPagesService', () => {
             const service = new GithubPagesService(createConfig());
             await service.setupBranch();
 
-            expect(mockGit.listRemote).toHaveBeenCalledWith(['--symref', 'HEAD']);
+            expect(mockGit.listRemote).toHaveBeenCalledWith(['--symref', 'origin', 'HEAD']);
             expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'main', { '--depth': 1, '--no-tags': null });
             expect(mockGit.checkoutBranch).toHaveBeenCalledWith('gh-pages', 'origin/main');
         });
