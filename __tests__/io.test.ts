@@ -12,13 +12,13 @@ vi.mock('@actions/core', () => ({
 import { warning } from '@actions/core';
 
 /** io.ts reads inputs at import time, so each case re-imports it */
-async function loadSquashAfterDays(value: string): Promise<number> {
-    rawInputs.squash_after_days = value;
+async function loadCommitRetentionDays(value: string): Promise<number> {
+    rawInputs.commit_retention_days = value;
     vi.resetModules();
-    return (await import('../src/io.js')).default.squash_after_days;
+    return (await import('../src/io.js')).default.commit_retention_days;
 }
 
-describe('squash_after_days input', () => {
+describe('commit_retention_days input', () => {
     beforeEach(() => {
         vi.mocked(warning).mockClear();
     });
@@ -29,12 +29,12 @@ describe('squash_after_days input', () => {
         ['7', 7],
         [' 30 ', 30],
     ])('accepts %j as %d', async (value, expected) => {
-        expect(await loadSquashAfterDays(value)).toBe(expected);
+        expect(await loadCommitRetentionDays(value)).toBe(expected);
         expect(warning).not.toHaveBeenCalled();
     });
 
-    it.each(['weekly', '7d', '0.5', '-1'])('disables squashing with a warning for %j', async (value) => {
-        expect(await loadSquashAfterDays(value)).toBe(0);
-        expect(warning).toHaveBeenCalledWith(expect.stringContaining('Invalid squash_after_days'));
+    it.each(['weekly', '7d', '0.5', '-1'])('disables pruning with a warning for %j', async (value) => {
+        expect(await loadCommitRetentionDays(value)).toBe(0);
+        expect(warning).toHaveBeenCalledWith(expect.stringContaining('Invalid commit_retention_days'));
     });
 });

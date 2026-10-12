@@ -30,7 +30,7 @@ const inputs: Inputs & DefaultConfig = {
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
-    squash_after_days: squashAfterDays(),
+    commit_retention_days: commitRetentionDays(),
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
@@ -52,12 +52,12 @@ function prefix(): string | undefined {
     return prefix ? replaceWhiteSpace(prefix) : undefined;
 }
 
-/** Non-negative whole number of days; anything else disables squashing with a warning instead of guessing */
-function squashAfterDays(): number {
-    const raw = String(getTypedInput('squash_after_days')).trim();
+/** Non-negative whole number of days; anything else disables pruning with a warning instead of guessing */
+function commitRetentionDays(): number {
+    const raw = String(getTypedInput('commit_retention_days')).trim();
     if (raw === '') return 0;
     if (!/^\d+$/.test(raw)) {
-        warning(`Invalid squash_after_days '${raw}': expected a non-negative whole number of days. Squashing is disabled.`);
+        warning(`Invalid commit_retention_days '${raw}': expected a non-negative whole number of days. Pruning is disabled.`);
         return 0;
     }
     return Number(raw);

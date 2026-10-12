@@ -13,7 +13,17 @@ vi.mock('@actions/github', () => ({
         serverUrl: 'https://github.com',
         payload: { sender: { id: 99 } },
     },
+    getOctokit: vi.fn(() => mockOctokit),
 }));
+
+const mockOctokit = {
+    graphql: vi.fn(),
+    rest: {
+        git: {
+            createCommit: vi.fn(async ({ tree }: { tree: string }) => ({ data: { sha: `new-${tree}` } })),
+        },
+    },
+};
 
 // Mock io.ts — the main challenge. This module executes at import time.
 vi.mock('../../src/io.js', () => ({
@@ -21,7 +31,7 @@ vi.mock('../../src/io.js', () => ({
         WORKSPACE: '/tmp/workspace',
         prefix: 'my-prefix',
         keep: 5,
-        squash_after_days: 0,
+        commit_retention_days: 0,
         RESULTS_STAGING_PATH: '/tmp/staging',
     },
 }));
@@ -45,8 +55,7 @@ const mockGit = {
     reset: vi.fn().mockReturnThis(),
     merge: vi.fn().mockReturnThis(),
     listRemote: vi.fn().mockResolvedValue('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n'),
-    revparse: vi.fn().mockResolvedValue('tree123\n'),
-    raw: vi.fn().mockResolvedValue('orphan123\n'),
+    revparse: vi.fn().mockResolvedValue('tip123\n'),
 };
 
 vi.mock('simple-git', () => ({
@@ -460,204 +469,199 @@ describe('GithubPagesService', () => {
         });
     });
 
-    describe('squash history', () => {
-        const markerMissing = (p: unknown) => !String(p).endsWith('.last-squash');
-        const isMarkerWrite = (call: unknown[]) => String(call[0]).endsWith('.last-squash');
-        const leasePush = ['origin', 'gh-pages', ['--force-with-lease=gh-pages:origin/gh-pages']];
-        const squashedLog = expect.stringContaining('Squashed');
+    describe('commit retention', () => {
+        const DAY = 24 * 60 * 60 * 1000;
         let remoteDefaultBranch: string;
 
-        /** Runs setupBranch (records the remote tip) then deployPages, like main.ts does */
-        async function setupAndDeploy(overrides: Partial<GitHubConfig> = {}): Promise<GithubPagesService> {
+        const node = (oid: string, date: string) => ({
+            oid,
+            message: `Allure report ${oid}`,
+            tree: { oid: `tree-${oid}` },
+            author: { name: 'ci', email: 'ci@x', date },
+            committer: { name: 'ci', email: 'ci@x', date },
+        });
+
+        /** One page of the retention query: `older` commits before the cutoff, `kept` newest first */
+        const page = (older: number, kept: ReturnType<typeof node>[], endCursor: string | null = null) => ({
+            repository: {
+                id: 'repo-id',
+                object: {
+                    older: { totalCount: older },
+                    kept: { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes: kept },
+                },
+            },
+        });
+
+        const queryCalls = () => mockOctokit.graphql.mock.calls.filter(([q]) => String(q).startsWith('query'));
+        const mutationCalls = () => mockOctokit.graphql.mock.calls.filter(([q]) => String(q).includes('updateRefs'));
+
+        /** Runs setupBranch then deployPages, like main.ts does */
+        async function setupAndDeploy(overrides: Partial<GitHubConfig> = {}): Promise<void> {
             mockGit.checkIsRepo.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
             const service = new GithubPagesService(createConfig({ pagesSourcePath: '', ...overrides }));
             await service.setupBranch();
             await service.deployPages();
-            return service;
-        }
-
-        async function retryOnce(): Promise<void> {
-            const { withRetry } = await import('../../src/utilities/util.js');
-            vi.mocked(withRetry).mockImplementationOnce(async (fn: any) => {
-                try {
-                    await fn();
-                } catch {
-                    await fn();
-                }
-            });
         }
 
         beforeEach(() => {
-            ioMock.squash_after_days = 1;
+            ioMock.commit_retention_days = 7;
             remoteDefaultBranch = 'main';
             mockGit.checkIsRepo.mockReset();
             mockGit.listRemote.mockImplementation(
                 (async () => `ref: refs/heads/${remoteDefaultBranch}\tHEAD\nabc123\tHEAD\n`) as any,
             );
             mockedReaddir.mockResolvedValue([]);
-            mockedReadFile.mockReset();
-            // Default: last squash was well over a day ago, so a squash is due
-            mockedReadFile.mockResolvedValue(String(Date.now() - 3 * 24 * 60 * 60 * 1000));
             mockedWarning.mockClear();
-            mockedInfo.mockClear();
-            mockedWriteFile.mockClear();
+            mockOctokit.graphql.mockReset();
+            mockOctokit.rest.git.createCommit.mockClear();
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2026-10-12T08:00:00Z'));
         });
 
         afterEach(() => {
-            ioMock.squash_after_days = 0;
-            mockGit.reset.mockImplementation((() => mockGit) as any);
+            ioMock.commit_retention_days = 0;
             mockGit.listRemote.mockReset();
             mockGit.listRemote.mockResolvedValue('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n');
             vi.useRealTimers();
         });
 
-        it('never squashes when squash_after_days is 0', async () => {
-            ioMock.squash_after_days = 0;
+        it('does nothing when commit_retention_days is 0', async () => {
+            ioMock.commit_retention_days = 0;
 
             await setupAndDeploy();
 
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(false);
+            expect(mockOctokit.graphql).not.toHaveBeenCalled();
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('squashes and pushes with a lease when the last squash is old enough', async () => {
+        it('08:00 drops the commits from 7 days ago, keeping newer ones oldest first on a new root', async () => {
+            mockOctokit.graphql
+                .mockResolvedValueOnce(
+                    page(2, [
+                        node('tip123', '2026-10-12T08:00:00Z'),
+                        node('d1', '2026-10-11T09:00:00Z'),
+                        node('d6', '2026-10-06T09:00:00Z'),
+                    ]),
+                )
+                .mockResolvedValueOnce({});
+
             await setupAndDeploy();
 
-            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
-            expect(mockGit.raw).toHaveBeenCalledWith([
-                'commit-tree',
-                'tree123',
-                '-m',
-                'Allure report for GitHub run: 12345',
+            // Normal push first — never forced
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+            // Cutoff = start of the UTC day 6 days ago: today plus the 6 previous days are kept
+            expect(queryCalls()[0][1]).toMatchObject({
+                oid: 'tip123',
+                cutoff: '2026-10-06T00:00:00.000Z',
+                olderUntil: '2026-10-05T23:59:59.000Z',
+            });
+
+            const created = mockOctokit.rest.git.createCommit.mock.calls.map(([args]) => args);
+            expect(created.map((c) => [c.tree, c.parents])).toEqual([
+                ['tree-d6', []],
+                ['tree-d1', ['new-tree-d6']],
+                ['tree-tip123', ['new-tree-d1']],
             ]);
-            expect(mockGit.reset).toHaveBeenCalledWith(['--soft', 'orphan123']);
-            expect(mockGit.push).toHaveBeenCalledWith(...leasePush);
-            expect(mockedInfo).toHaveBeenCalledWith(squashedLog);
+            expect(created[0]).toMatchObject({
+                message: 'Allure report d6',
+                author: { name: 'ci', email: 'ci@x', date: '2026-10-06T09:00:00Z' },
+                committer: { name: 'ci', email: 'ci@x', date: '2026-10-06T09:00:00Z' },
+            });
+
+            expect(mutationCalls()[0][1]).toEqual({
+                repositoryId: 'repo-id',
+                name: 'refs/heads/gh-pages',
+                beforeOid: 'tip123',
+                afterOid: 'new-tree-tip123',
+            });
         });
 
-        it('only starts the clock when the marker is missing', async () => {
-            mockedExistsSync.mockImplementation(markerMissing);
-
-            await setupAndDeploy();
-
-            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
-        });
-
-        it('restarts the clock when the marker is unreadable', async () => {
-            mockedReadFile.mockResolvedValue('not-a-timestamp');
-
-            await setupAndDeploy();
-
-            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Invalid'));
-            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
-        });
-
-        it('squashes on the first deploy of the day and pushes normally later that day', async () => {
-            // 08:00 deploy: last squash was yesterday 16:00
-            vi.useFakeTimers({ toFake: ['Date'] });
-            vi.setSystemTime(new Date('2026-10-12T08:00:00Z'));
-            mockedReadFile.mockResolvedValue(String(Date.parse('2026-10-11T16:00:00Z')));
-
-            await setupAndDeploy();
-            expect(mockGit.push).toHaveBeenLastCalledWith(...leasePush);
-
-            // 16:00 deploy: the 08:00 squash wrote today's marker
-            mockGit.push.mockClear();
-            mockGit.raw.mockClear();
+        it('16:00 finds nothing older and only does the normal push', async () => {
             vi.setSystemTime(new Date('2026-10-12T16:00:00Z'));
-            mockedReadFile.mockResolvedValue(String(Date.parse('2026-10-12T08:00:00Z')));
+            mockOctokit.graphql.mockResolvedValueOnce(page(0, [node('tip123', '2026-10-12T16:00:00Z')]));
 
             await setupAndDeploy();
-            expect(mockGit.raw).not.toHaveBeenCalled();
+
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+            expect(queryCalls()).toHaveLength(1);
+            expect(mockOctokit.rest.git.createCommit).not.toHaveBeenCalled();
+            expect(mutationCalls()).toHaveLength(0);
+        });
+
+        it('with 1 keeps only today', async () => {
+            ioMock.commit_retention_days = 1;
+            mockOctokit.graphql.mockResolvedValueOnce(page(0, []));
+
+            await setupAndDeploy();
+
+            expect(queryCalls()[0][1]).toMatchObject({ cutoff: '2026-10-12T00:00:00.000Z' });
+        });
+
+        it('pages through more than 100 kept commits', async () => {
+            mockOctokit.graphql
+                .mockResolvedValueOnce(page(5, [node('tip123', '2026-10-12T08:00:00Z')], 'cursor-1'))
+                .mockResolvedValueOnce(page(5, [node('d3', '2026-10-09T09:00:00Z')]))
+                .mockResolvedValueOnce({});
+
+            await setupAndDeploy();
+
+            expect(queryCalls()[1][1]).toMatchObject({ cursor: 'cursor-1' });
+            const created = mockOctokit.rest.git.createCommit.mock.calls.map(([args]) => args.tree);
+            expect(created).toEqual(['tree-d3', 'tree-tip123']);
+        });
+
+        it('skips with a warning when another deploy moved the branch meanwhile', async () => {
+            mockOctokit.graphql
+                .mockResolvedValueOnce(page(2, [node('tip123', '2026-10-12T08:00:00Z')]))
+                .mockRejectedValueOnce(new Error('Expected refs/heads/gh-pages to point to tip123'));
+
+            await expect(setupAndDeploy()).resolves.toBeUndefined();
+
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Skipped pruning old commits'));
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('waits the configured number of calendar days', async () => {
-            ioMock.squash_after_days = 7;
-            vi.useFakeTimers({ toFake: ['Date'] });
-            vi.setSystemTime(new Date('2026-10-12T08:00:00Z'));
-            mockedReadFile.mockResolvedValue(String(Date.parse('2026-10-06T23:00:00Z')));
+        it('does not fail the deploy when the API is unavailable', async () => {
+            mockOctokit.graphql.mockRejectedValueOnce(new Error('Resource not accessible by integration'));
 
-            await setupAndDeploy();
+            await expect(setupAndDeploy()).resolves.toBeUndefined();
 
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Skipped pruning old commits'));
+            expect(mockOctokit.rest.git.createCommit).not.toHaveBeenCalled();
         });
 
-        it('does not squash a branch that is new on the remote', async () => {
-            mockGit.fetch.mockResolvedValueOnce({ branches: [] });
-
-            await setupAndDeploy();
-
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
-        });
-
-        it('does not squash a new branch after a retry resets onto a parallel deploy', async () => {
-            await retryOnce();
-            mockGit.fetch.mockResolvedValueOnce({ branches: [] });
-            mockGit.push.mockRejectedValueOnce(new Error('! [rejected] gh-pages -> gh-pages (fetch first)'));
-
-            await setupAndDeploy();
-
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages');
-        });
-
-        it('refuses to squash the default branch', async () => {
+        it('never prunes the repository default branch', async () => {
             remoteDefaultBranch = 'gh-pages';
 
             await setupAndDeploy();
 
             expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('default branch'));
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+            expect(mockOctokit.graphql).not.toHaveBeenCalled();
         });
 
-        it('refuses to squash a branch serving Pages from a subfolder', async () => {
+        it('never prunes a branch serving Pages from a subfolder', async () => {
             await setupAndDeploy({ pagesSourcePath: 'docs' });
 
-            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining("'/docs'"));
-            expect(mockGit.raw).not.toHaveBeenCalled();
-            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('/docs'));
+            expect(mockOctokit.graphql).not.toHaveBeenCalled();
         });
 
-        it.each([
-            ['a lost race', '! [rejected] gh-pages -> gh-pages (stale info)'],
-            ['blocked force pushes', 'remote: error: GH013: Repository rule violations found'],
-            ['a network error', 'fatal: unable to access: RPC failed; HTTP 502'],
-        ])('skips the squash for the rest of the run after %s', async (_, message) => {
-            await retryOnce();
-            mockGit.push.mockRejectedValueOnce(new Error(message));
+        it('never prunes a branch that is new on the remote', async () => {
+            mockGit.fetch.mockResolvedValueOnce({ branches: [] });
 
             await setupAndDeploy();
 
-            expect(mockGit.push).toHaveBeenNthCalledWith(1, ...leasePush);
-            expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages');
-            expect(mockGit.raw).toHaveBeenCalledTimes(1);
-            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('skipping squash for this run'));
-            expect(mockedInfo).not.toHaveBeenCalledWith(squashedLog);
+            expect(mockOctokit.graphql).not.toHaveBeenCalled();
         });
 
-        it('squashes with a lease when a squash becomes due after a retry', async () => {
-            await retryOnce();
-            // First attempt: squashed today already. After the retry reset, the remote holds an old marker.
-            mockedReadFile.mockResolvedValue(String(Date.now()));
-            mockGit.reset.mockImplementation(((args: string[]) => {
-                if (args[0] === '--hard') mockedReadFile.mockResolvedValue('0');
-                return mockGit;
-            }) as any);
-            mockGit.push.mockRejectedValueOnce(new Error('rejected'));
+        it('keeps the cutoff stable until the UTC day ends', async () => {
+            vi.setSystemTime(new Date(Date.parse('2026-10-12T00:00:00Z') + DAY - 1));
+            mockOctokit.graphql.mockResolvedValueOnce(page(0, []));
 
             await setupAndDeploy();
 
-            expect(mockGit.push).toHaveBeenNthCalledWith(1, 'origin', 'gh-pages');
-            expect(mockGit.push).toHaveBeenNthCalledWith(2, ...leasePush);
+            expect(queryCalls()[0][1]).toMatchObject({ cutoff: '2026-10-06T00:00:00.000Z' });
         });
     });
+
 });

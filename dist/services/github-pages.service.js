@@ -2,15 +2,32 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, posix } from 'node:path';
 import { simpleGit, CheckRepoActions } from 'simple-git';
-import { context } from '@actions/github';
+import { context, getOctokit } from '@actions/github';
 import pLimit from 'p-limit';
 import { info, warning } from '@actions/core';
 import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
 import { allFulfilledResults, DEFAULT_RETRY_CONFIG, removeTrailingSlash, withRetry } from '../utilities/util.js';
-/** Branch-root file holding the Date.now() timestamp of the last history squash */
-export const SQUASH_MARKER = '.last-squash';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const RETENTION_QUERY = `query($owner: String!, $repo: String!, $oid: GitObjectID!, $cutoff: GitTimestamp!, $olderUntil: GitTimestamp!, $cursor: String) {
+  repository(owner: $owner, name: $repo) {
+    id
+    object(oid: $oid) {
+      ... on Commit {
+        older: history(until: $olderUntil, first: 1) { totalCount }
+        kept: history(since: $cutoff, first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes { oid message tree { oid } author { name email date } committer { name email date } }
+        }
+      }
+    }
+  }
+}`;
+const UPDATE_REF_MUTATION = `mutation($repositoryId: ID!, $name: GitRefname!, $beforeOid: GitObjectID!, $afterOid: GitObjectID!) {
+  updateRefs(input: { repositoryId: $repositoryId, refUpdates: [{ name: $name, beforeOid: $beforeOid, afterOid: $afterOid, force: true }] }) {
+    clientMutationId
+  }
+}`;
 export class GithubPagesService {
     git;
     branch;
@@ -24,11 +41,7 @@ export class GithubPagesService {
     deployVersion;
     historyPath;
     /** Decided once in setupBranch: the branch existed on the remote and is a dedicated Pages branch */
-    squashAllowed = false;
-    /** Set by prepareAndCommit when HEAD was squashed and must be pushed with a lease */
-    squashed = false;
-    /** Set when a squash push fails, so later attempts in this run push normally */
-    squashBlocked = false;
+    pruneAllowed = false;
     constructor(config) {
         this.branch = config.branch;
         this.owner = config.owner;
@@ -57,6 +70,15 @@ export class GithubPagesService {
         await this.prepareAndCommit();
         await this.gitPushWithRetry();
         info(`Allure report pages pushed to '${this.reportDir}' on '${this.branch}' branch`);
+        if (this.pruneAllowed) {
+            try {
+                await this.pruneOldCommits();
+            }
+            catch (error) {
+                // Housekeeping only: the report is already published, and a later deploy prunes instead
+                warning(`Skipped pruning old commits on '${this.branch}': ${error}`);
+            }
+        }
     }
     /** Deletes old reports, creates redirect/summary pages, stages the report, and commits */
     async prepareAndCommit() {
@@ -80,71 +102,93 @@ export class GithubPagesService {
         if (this.historyPath && existsSync(this.historyPath)) {
             await this.git.add(this.historyPath);
         }
-        // Decided on every attempt: after a retry reset, the remote may have just been squashed by another deploy
-        const squash = await this.squashDecision();
-        if (squash !== 'none') {
-            const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
-            await writeFile(markerPath, Date.now().toString(), 'utf8');
-            await this.git.add(markerPath);
-        }
-        const message = `Allure report for GitHub run: ${context.runId}`;
-        await this.git.commit(message);
-        if (squash === 'squash') {
-            await this.squashHistory(message);
-        }
-        this.squashed = squash === 'squash';
+        await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
     }
     /**
-     * 'squash' when at least `squash_after_days` calendar days (UTC) passed since the last squash per the marker
-     * file. Calendar days, not 24h periods: with 1, the first deploy of each day squashes and later deploys that
-     * day push normally, regardless of what time the runs happen. A missing or invalid marker only starts the
-     * clock ('start'), so enabling the option or losing the marker never squashes right away.
+     * Drops branch commits from before the last `commit_retention_days` UTC calendar days (today counts as one),
+     * keeping newer commits with their original authors and dates. With 7, the first deploy of a day removes the
+     * commits made 7 days ago; later deploys that day find nothing older and do nothing.
+     *
+     * Runs after the normal push and rewrites history on GitHub's side via the API, reusing trees the server
+     * already has: a local rewrite would re-upload every report, because git cannot tell that a commit with
+     * no shared history references objects the server already stores. The ref only moves if it still points
+     * at the commit just pushed, so a deploy that landed meanwhile is never dropped.
      */
-    async squashDecision() {
-        if (!this.squashAllowed || this.squashBlocked)
-            return 'none';
-        const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
-        if (!existsSync(markerPath)) {
-            info(`No '${SQUASH_MARKER}' marker on '${this.branch}', starting the squash_after_days clock`);
-            return 'start';
+    async pruneOldCommits() {
+        const head = (await this.git.revparse(['HEAD'])).trim();
+        const todayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+        const cutoffMs = todayStart - (inputs.commit_retention_days - 1) * DAY_MS;
+        const cutoff = new Date(cutoffMs).toISOString();
+        const olderUntil = new Date(cutoffMs - 1000).toISOString();
+        const octokit = getOctokit(this.token);
+        const kept = [];
+        let repositoryId = '';
+        let cursor = null;
+        do {
+            const result = await octokit.graphql(RETENTION_QUERY, {
+                owner: this.owner,
+                repo: this.repo,
+                oid: head,
+                cutoff,
+                olderUntil,
+                cursor,
+            });
+            const commit = result.repository.object;
+            if (!commit)
+                throw new Error(`commit ${head} not found on the remote`);
+            if (commit.older.totalCount === 0)
+                return;
+            repositoryId = result.repository.id;
+            kept.push(...commit.kept.nodes);
+            cursor = commit.kept.pageInfo.hasNextPage ? commit.kept.pageInfo.endCursor : null;
+        } while (cursor);
+        // history() lists newest first; rebuild oldest first on a new root
+        let parent;
+        for (const node of kept.reverse()) {
+            const { data } = await octokit.rest.git.createCommit({
+                owner: this.owner,
+                repo: this.repo,
+                message: node.message,
+                tree: node.tree.oid,
+                parents: parent ? [parent] : [],
+                author: node.author,
+                committer: node.committer,
+            });
+            parent = data.sha;
         }
-        const lastSquash = Number((await readFile(markerPath, 'utf8')).trim());
-        if (!Number.isFinite(lastSquash)) {
-            warning(`Invalid '${SQUASH_MARKER}' content, restarting the squash_after_days clock`);
-            return 'start';
-        }
-        const daysSinceSquash = Math.floor(Date.now() / DAY_MS) - Math.floor(lastSquash / DAY_MS);
-        return daysSinceSquash >= inputs.squash_after_days ? 'squash' : 'none';
+        if (!parent)
+            return;
+        await octokit.graphql(UPDATE_REF_MUTATION, {
+            repositoryId,
+            name: `refs/heads/${this.branch}`,
+            beforeOid: head,
+            afterOid: parent,
+        });
+        info(`Pruned commits older than ${cutoff.slice(0, 10)} from '${this.branch}', kept ${kept.length} (commit_retention_days: ${inputs.commit_retention_days})`);
     }
     /**
-     * Squashing rewrites the whole branch, so it is limited to a dedicated Pages branch: never the repo's
-     * default branch, and never a branch serving Pages from a subfolder (e.g. `main` with `/docs`), where
-     * the rest of the tree is source code whose history must survive.
+     * Pruning rewrites branch history, so it is limited to a dedicated Pages branch: never the repo's default
+     * branch, and never a branch serving Pages from a subfolder (e.g. `main` with `/docs`), where the rest of
+     * the tree is source code whose history must survive.
      */
-    async isSquashAllowed() {
-        if (inputs.squash_after_days <= 0)
+    async isPruneAllowed() {
+        if (inputs.commit_retention_days <= 0)
             return false;
         if (this.pagesSourcePath) {
-            warning(`squash_after_days ignored: Pages is served from '/${this.pagesSourcePath}' on '${this.branch}', so the branch likely holds source code`);
+            warning(`commit_retention_days ignored: Pages is served from '/${this.pagesSourcePath}' on '${this.branch}', so the branch likely holds source code`);
             return false;
         }
         try {
             if ((await this.getDefaultBranch()) === this.branch) {
-                warning(`squash_after_days ignored: '${this.branch}' is the repository's default branch`);
+                warning(`commit_retention_days ignored: '${this.branch}' is the repository's default branch`);
                 return false;
             }
         }
         catch (error) {
-            warning(`squash_after_days ignored: could not determine the default branch: ${error}`);
+            warning(`commit_retention_days ignored: could not determine the default branch: ${error}`);
             return false;
         }
         return true;
-    }
-    /** Replaces HEAD with a parentless commit of the same tree, dropping all earlier branch history */
-    async squashHistory(message) {
-        const tree = (await this.git.revparse(['HEAD^{tree}'])).trim();
-        const orphan = (await this.git.raw(['commit-tree', tree, '-m', message])).trim();
-        await this.git.reset(['--soft', orphan]);
     }
     /** Initializes and sets up the branch for GitHub Pages deployment */
     async setupBranch() {
@@ -171,8 +215,8 @@ export class GithubPagesService {
         }
         else {
             await this.git.checkoutBranch(this.branch, `origin/${this.branch}`);
-            // A branch new on the remote is never squashed, even after a retry resets onto a parallel deploy's tip
-            this.squashAllowed = await this.isSquashAllowed();
+            // A branch new on the remote is never pruned, even after a retry resets onto a parallel deploy's tip
+            this.pruneAllowed = await this.isPruneAllowed();
         }
         return this.pageUrl;
     }
@@ -382,25 +426,9 @@ export class GithubPagesService {
                     await this.prepareAndCommit();
                 }
                 try {
-                    if (this.squashed) {
-                        // Lease on the fetched tip we squashed (origin/<branch> only moves on our own fetches):
-                        // if another deploy pushed meanwhile, this is rejected instead of overwriting its report
-                        await this.git.push('origin', this.branch, [
-                            `--force-with-lease=${this.branch}:origin/${this.branch}`,
-                        ]);
-                        info(`Squashed '${this.branch}' history into a single commit (squash_after_days: ${inputs.squash_after_days})`);
-                    }
-                    else {
-                        await this.git.push('origin', this.branch);
-                    }
+                    await this.git.push('origin', this.branch);
                 }
                 catch (error) {
-                    // Squashing is housekeeping: whatever the cause (lost race, blocked force push, network),
-                    // skip it for this run and push normally — a later deploy squashes instead
-                    if (this.squashed) {
-                        this.squashBlocked = true;
-                        warning(`Squash push to '${this.branch}' failed, skipping squash for this run: ${error}`);
-                    }
                     // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {
                         await cp(this.reportDir, backupDir, { recursive: true });

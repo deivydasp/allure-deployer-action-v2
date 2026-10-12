@@ -13,7 +13,7 @@ export interface Inputs {
 
     language?: string;
     keep: number;
-    squash_after_days: number;
+    commit_retention_days: number;
     prefix?: string;
     fail_on_test_failure: boolean;
 }
