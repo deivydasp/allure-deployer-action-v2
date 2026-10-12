@@ -10,6 +10,10 @@ import inputs from '../io.js';
 import { HostingProvider } from '../interfaces/hosting-provider.interface.js';
 import { allFulfilledResults, DEFAULT_RETRY_CONFIG, removeTrailingSlash, withRetry } from '../utilities/util.js';
 
+/** Branch-root file holding the Date.now() timestamp of the last history squash */
+export const SQUASH_MARKER = '.last-squash';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export type GitHubConfig = {
     owner: string;
     repo: string;
@@ -33,6 +37,12 @@ export class GithubPagesService implements HostingProvider {
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion?: string;
     private readonly historyPath?: string;
+    /** Remote branch tip the checkout is based on — the lease for a squash push. Undefined for a new branch. */
+    private remoteTip?: string;
+    /** Set by prepareAndCommit when HEAD was squashed and must be pushed with a lease */
+    private squashed = false;
+    /** Set when a squash push is rejected for a reason other than a lost race (e.g. force pushes are blocked) */
+    private squashBlocked = false;
 
     constructor(config: GitHubConfig) {
         this.branch = config.branch;
@@ -94,7 +104,49 @@ export class GithubPagesService implements HostingProvider {
         if (this.historyPath && existsSync(this.historyPath)) {
             await this.git.add(this.historyPath);
         }
-        await this.git.commit(`Allure report for GitHub run: ${context.runId}`);
+
+        // Decided on every attempt: after a retry reset, the remote may have just been squashed by another deploy
+        const squash = await this.isSquashDue();
+        if (squash) {
+            const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
+            await writeFile(markerPath, Date.now().toString(), 'utf8');
+            await this.git.add(markerPath);
+        }
+
+        const message = `Allure report for GitHub run: ${context.runId}`;
+        await this.git.commit(message);
+        if (squash) {
+            await this.squashHistory(message);
+        }
+        this.squashed = squash;
+    }
+
+    /**
+     * True when `squash_after_days` is set and at least that many calendar days (UTC) passed since the last
+     * squash per the marker file. Calendar days, not 24h periods: with 1, the first deploy of each day squashes
+     * and later deploys that day push normally, regardless of what time the runs happen.
+     */
+    private async isSquashDue(): Promise<boolean> {
+        if (inputs.squash_after_days <= 0 || !this.remoteTip || this.squashBlocked) return false;
+
+        const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
+        if (!existsSync(markerPath)) return true;
+
+        const lastSquash = Number((await readFile(markerPath, 'utf8')).trim());
+        if (!Number.isFinite(lastSquash)) {
+            warning(`Invalid '${SQUASH_MARKER}' content, treating history as due for squash`);
+            return true;
+        }
+        const daysSinceSquash = Math.floor(Date.now() / DAY_MS) - Math.floor(lastSquash / DAY_MS);
+        return daysSinceSquash >= inputs.squash_after_days;
+    }
+
+    /** Replaces HEAD with a parentless commit of the same tree, dropping all earlier branch history */
+    private async squashHistory(message: string): Promise<void> {
+        const tree = (await this.git.revparse(['HEAD^{tree}'])).trim();
+        const orphan = (await this.git.raw(['commit-tree', tree, '-m', message])).trim();
+        await this.git.reset(['--soft', orphan]);
+        info(`Squashing '${this.branch}' history into a single commit (squash_after_days: ${inputs.squash_after_days})`);
     }
 
     /** Initializes and sets up the branch for GitHub Pages deployment */
@@ -133,6 +185,7 @@ export class GithubPagesService implements HostingProvider {
             await this.createBranchFromDefault();
         } else {
             await this.git.checkoutBranch(this.branch, `origin/${this.branch}`);
+            this.remoteTip = (await this.git.revparse([`origin/${this.branch}`])).trim();
         }
 
         return this.pageUrl;
@@ -348,6 +401,7 @@ export class GithubPagesService implements HostingProvider {
                     }
                     await this.git.fetch('origin', this.branch, { '--depth': 1 });
                     await this.git.reset(['--hard', `origin/${this.branch}`]);
+                    this.remoteTip = (await this.git.revparse([`origin/${this.branch}`])).trim();
                     await cp(backupDir, this.reportDir, { recursive: true });
                     // Restore history backup — overwrites remote history with our generated version
                     if (this.historyPath && existsSync(historyBackupDir)) {
@@ -357,8 +411,22 @@ export class GithubPagesService implements HostingProvider {
                 }
 
                 try {
-                    await this.git.push('origin', this.branch);
+                    if (this.squashed) {
+                        // Lease on the tip we squashed: if another deploy pushed meanwhile, this is rejected
+                        // instead of overwriting its report, and the retry re-applies on top of it
+                        await this.git.push('origin', this.branch, [
+                            `--force-with-lease=${this.branch}:${this.remoteTip}`,
+                        ]);
+                    } else {
+                        await this.git.push('origin', this.branch);
+                    }
                 } catch (error: unknown) {
+                    // A lost race shows as "stale info"; anything else (e.g. a rule blocking force pushes)
+                    // must not fail the deploy, so later attempts fall back to a normal push
+                    if (this.squashed && !/stale info/i.test(String(error))) {
+                        this.squashBlocked = true;
+                        warning(`Squash push to '${this.branch}' rejected, falling back to a normal push: ${error}`);
+                    }
                     // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {
                         await cp(this.reportDir, backupDir, { recursive: true });

@@ -177,6 +177,7 @@ A [CI workflow](.github/workflows/ci.yml) runs on push to master — validates b
 | `custom_report_dir`   | Directory to copy the generated report into, for use in subsequent workflow steps.              | —                   | No       |
 | `prefix`              | Prefix to uniquely identify test report artifacts. Used for summary page, redirect page, rerun tracking, and summary mode. | `allure-report` | No |
 | `keep`                | Number of test reports to keep alive. Also limits history entries.                              | `10`                | No       |
+| `squash_after_days`   | Squash the GitHub Pages branch into a single commit on the first deploy after this many calendar days (UTC) since the last squash — with `1`, the first deploy of each day squashes and later ones push normally. Keeps all report files and history; only old commits are dropped, so clones of the repo stay small. Pushed with `--force-with-lease`, so a concurrent deploy is never overwritten. `0` disables it. | `0` | No |
 | `pr_comment`          | Post report info as a PR comment. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
 | `summary`             | Write a GitHub Actions job summary after deployment. Set to `false` when using a separate summary job. | `true` | No |
 | `prefixes`            | Comma-separated list of prefixes to include in summary mode. If omitted, all prefixes are scanned. | — | No |

@@ -27,6 +27,7 @@ const inputs = {
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
+    squash_after_days: Math.max(0, Number(getInput('squash_after_days')) || 0),
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,

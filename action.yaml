@@ -59,6 +59,9 @@ inputs:
   keep:
     description: "Number of test reports you want to keep alive"
     default: '10'
+  squash_after_days:
+    description: "Squash the GitHub Pages branch history into a single commit on the first deploy after this many calendar days (UTC) since the last squash. With 1, the first deploy of each day squashes and later deploys that day push normally. Report files and history are kept; only old commits are dropped. The squash push uses --force-with-lease, so concurrent deploys are never overwritten. 0 disables squashing."
+    default: '0'
   fail_on_test_failure:
     description: "Fail the action after deployment if any tests failed or broken. Report is always deployed first."
     default: 'false'
