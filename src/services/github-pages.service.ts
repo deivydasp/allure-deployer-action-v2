@@ -37,11 +37,11 @@ export class GithubPagesService implements HostingProvider {
     /** Set during deploy — the version timestamp embedded in the summary page */
     deployVersion?: string;
     private readonly historyPath?: string;
-    /** Remote branch tip the checkout is based on — the lease for a squash push. Undefined for a new branch. */
-    private remoteTip?: string;
+    /** Decided once in setupBranch: the branch existed on the remote and is a dedicated Pages branch */
+    private squashAllowed = false;
     /** Set by prepareAndCommit when HEAD was squashed and must be pushed with a lease */
     private squashed = false;
-    /** Set when a squash push is rejected for a reason other than a lost race (e.g. force pushes are blocked) */
+    /** Set when a squash push fails, so later attempts in this run push normally */
     private squashBlocked = false;
 
     constructor(config: GitHubConfig) {
@@ -106,8 +106,8 @@ export class GithubPagesService implements HostingProvider {
         }
 
         // Decided on every attempt: after a retry reset, the remote may have just been squashed by another deploy
-        const squash = await this.isSquashDue();
-        if (squash) {
+        const squash = await this.squashDecision();
+        if (squash !== 'none') {
             const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
             await writeFile(markerPath, Date.now().toString(), 'utf8');
             await this.git.add(markerPath);
@@ -115,30 +115,57 @@ export class GithubPagesService implements HostingProvider {
 
         const message = `Allure report for GitHub run: ${context.runId}`;
         await this.git.commit(message);
-        if (squash) {
+        if (squash === 'squash') {
             await this.squashHistory(message);
         }
-        this.squashed = squash;
+        this.squashed = squash === 'squash';
     }
 
     /**
-     * True when `squash_after_days` is set and at least that many calendar days (UTC) passed since the last
-     * squash per the marker file. Calendar days, not 24h periods: with 1, the first deploy of each day squashes
-     * and later deploys that day push normally, regardless of what time the runs happen.
+     * 'squash' when at least `squash_after_days` calendar days (UTC) passed since the last squash per the marker
+     * file. Calendar days, not 24h periods: with 1, the first deploy of each day squashes and later deploys that
+     * day push normally, regardless of what time the runs happen. A missing or invalid marker only starts the
+     * clock ('start'), so enabling the option or losing the marker never squashes right away.
      */
-    private async isSquashDue(): Promise<boolean> {
-        if (inputs.squash_after_days <= 0 || !this.remoteTip || this.squashBlocked) return false;
+    private async squashDecision(): Promise<'squash' | 'start' | 'none'> {
+        if (!this.squashAllowed || this.squashBlocked) return 'none';
 
         const markerPath = join(inputs.WORKSPACE, SQUASH_MARKER);
-        if (!existsSync(markerPath)) return true;
+        if (!existsSync(markerPath)) {
+            info(`No '${SQUASH_MARKER}' marker on '${this.branch}', starting the squash_after_days clock`);
+            return 'start';
+        }
 
         const lastSquash = Number((await readFile(markerPath, 'utf8')).trim());
         if (!Number.isFinite(lastSquash)) {
-            warning(`Invalid '${SQUASH_MARKER}' content, treating history as due for squash`);
-            return true;
+            warning(`Invalid '${SQUASH_MARKER}' content, restarting the squash_after_days clock`);
+            return 'start';
         }
         const daysSinceSquash = Math.floor(Date.now() / DAY_MS) - Math.floor(lastSquash / DAY_MS);
-        return daysSinceSquash >= inputs.squash_after_days;
+        return daysSinceSquash >= inputs.squash_after_days ? 'squash' : 'none';
+    }
+
+    /**
+     * Squashing rewrites the whole branch, so it is limited to a dedicated Pages branch: never the repo's
+     * default branch, and never a branch serving Pages from a subfolder (e.g. `main` with `/docs`), where
+     * the rest of the tree is source code whose history must survive.
+     */
+    private async isSquashAllowed(): Promise<boolean> {
+        if (inputs.squash_after_days <= 0) return false;
+        if (this.pagesSourcePath) {
+            warning(`squash_after_days ignored: Pages is served from '/${this.pagesSourcePath}' on '${this.branch}', so the branch likely holds source code`);
+            return false;
+        }
+        try {
+            if ((await this.getDefaultBranch()) === this.branch) {
+                warning(`squash_after_days ignored: '${this.branch}' is the repository's default branch`);
+                return false;
+            }
+        } catch (error) {
+            warning(`squash_after_days ignored: could not determine the default branch: ${error}`);
+            return false;
+        }
+        return true;
     }
 
     /** Replaces HEAD with a parentless commit of the same tree, dropping all earlier branch history */
@@ -146,7 +173,6 @@ export class GithubPagesService implements HostingProvider {
         const tree = (await this.git.revparse(['HEAD^{tree}'])).trim();
         const orphan = (await this.git.raw(['commit-tree', tree, '-m', message])).trim();
         await this.git.reset(['--soft', orphan]);
-        info(`Squashing '${this.branch}' history into a single commit (squash_after_days: ${inputs.squash_after_days})`);
     }
 
     /** Initializes and sets up the branch for GitHub Pages deployment */
@@ -185,7 +211,8 @@ export class GithubPagesService implements HostingProvider {
             await this.createBranchFromDefault();
         } else {
             await this.git.checkoutBranch(this.branch, `origin/${this.branch}`);
-            this.remoteTip = (await this.git.revparse([`origin/${this.branch}`])).trim();
+            // A branch new on the remote is never squashed, even after a retry resets onto a parallel deploy's tip
+            this.squashAllowed = await this.isSquashAllowed();
         }
 
         return this.pageUrl;
@@ -366,8 +393,8 @@ export class GithubPagesService implements HostingProvider {
         }
     }
 
-    /** Creates a branch from the default branch if it doesn't exist */
-    private async createBranchFromDefault(): Promise<void> {
+    /** Resolves the repository's default branch from the remote */
+    private async getDefaultBranch(): Promise<string> {
         // Use ls-remote instead of symbolic-ref — symbolic-ref requires origin/HEAD
         // which isn't set after a targeted fetch (only after clone or remote set-head).
         const lsRemote = await this.git.listRemote(['--symref', 'HEAD']);
@@ -376,7 +403,12 @@ export class GithubPagesService implements HostingProvider {
         if (!match?.[1]) {
             throw new Error(`Could not determine default branch from ls-remote output: '${lsRemote.trim()}'`);
         }
-        const defaultBranch = match[1];
+        return match[1];
+    }
+
+    /** Creates a branch from the default branch if it doesn't exist */
+    private async createBranchFromDefault(): Promise<void> {
+        const defaultBranch = await this.getDefaultBranch();
 
         await this.git.fetch('origin', defaultBranch, { '--depth': 1, '--no-tags': null });
         await this.git.checkoutBranch(this.branch, `origin/${defaultBranch}`);
@@ -401,7 +433,6 @@ export class GithubPagesService implements HostingProvider {
                     }
                     await this.git.fetch('origin', this.branch, { '--depth': 1 });
                     await this.git.reset(['--hard', `origin/${this.branch}`]);
-                    this.remoteTip = (await this.git.revparse([`origin/${this.branch}`])).trim();
                     await cp(backupDir, this.reportDir, { recursive: true });
                     // Restore history backup — overwrites remote history with our generated version
                     if (this.historyPath && existsSync(historyBackupDir)) {
@@ -412,20 +443,21 @@ export class GithubPagesService implements HostingProvider {
 
                 try {
                     if (this.squashed) {
-                        // Lease on the tip we squashed: if another deploy pushed meanwhile, this is rejected
-                        // instead of overwriting its report, and the retry re-applies on top of it
+                        // Lease on the fetched tip we squashed (origin/<branch> only moves on our own fetches):
+                        // if another deploy pushed meanwhile, this is rejected instead of overwriting its report
                         await this.git.push('origin', this.branch, [
-                            `--force-with-lease=${this.branch}:${this.remoteTip}`,
+                            `--force-with-lease=${this.branch}:origin/${this.branch}`,
                         ]);
+                        info(`Squashed '${this.branch}' history into a single commit (squash_after_days: ${inputs.squash_after_days})`);
                     } else {
                         await this.git.push('origin', this.branch);
                     }
                 } catch (error: unknown) {
-                    // A lost race shows as "stale info"; anything else (e.g. a rule blocking force pushes)
-                    // must not fail the deploy, so later attempts fall back to a normal push
-                    if (this.squashed && !/stale info/i.test(String(error))) {
+                    // Squashing is housekeeping: whatever the cause (lost race, blocked force push, network),
+                    // skip it for this run and push normally — a later deploy squashes instead
+                    if (this.squashed) {
                         this.squashBlocked = true;
-                        warning(`Squash push to '${this.branch}' rejected, falling back to a normal push: ${error}`);
+                        warning(`Squash push to '${this.branch}' failed, skipping squash for this run: ${error}`);
                     }
                     // Back up report and history before retry — reset --hard will wipe the working tree
                     if (!backupCreated) {

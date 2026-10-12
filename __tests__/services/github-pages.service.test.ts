@@ -45,7 +45,7 @@ const mockGit = {
     reset: vi.fn().mockReturnThis(),
     merge: vi.fn().mockReturnThis(),
     listRemote: vi.fn().mockResolvedValue('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n'),
-    revparse: vi.fn(async (args: string[]) => (args[0] === 'HEAD^{tree}' ? 'tree123\n' : 'tip123\n')),
+    revparse: vi.fn().mockResolvedValue('tree123\n'),
     raw: vi.fn().mockResolvedValue('orphan123\n'),
 };
 
@@ -84,7 +84,7 @@ vi.mock('../../src/utilities/util.js', () => ({
 
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { warning } from '@actions/core';
+import { info, warning } from '@actions/core';
 import ioMock from '../../src/io.js';
 
 const mockedExistsSync = vi.mocked(existsSync);
@@ -96,6 +96,7 @@ const mockedCp = vi.mocked(cp);
 const mockedWriteFile = vi.mocked(writeFile);
 const mockedReadFile = vi.mocked(readFile);
 const mockedWarning = vi.mocked(warning);
+const mockedInfo = vi.mocked(info);
 
 function createConfig(overrides: Partial<GitHubConfig> = {}): GitHubConfig {
     return {
@@ -462,12 +463,14 @@ describe('GithubPagesService', () => {
     describe('squash history', () => {
         const markerMissing = (p: unknown) => !String(p).endsWith('.last-squash');
         const isMarkerWrite = (call: unknown[]) => String(call[0]).endsWith('.last-squash');
-        const leasePush = ['origin', 'gh-pages', ['--force-with-lease=gh-pages:tip123']];
+        const leasePush = ['origin', 'gh-pages', ['--force-with-lease=gh-pages:origin/gh-pages']];
+        const squashedLog = expect.stringContaining('Squashed');
+        let remoteDefaultBranch: string;
 
         /** Runs setupBranch (records the remote tip) then deployPages, like main.ts does */
-        async function setupAndDeploy(): Promise<GithubPagesService> {
+        async function setupAndDeploy(overrides: Partial<GitHubConfig> = {}): Promise<GithubPagesService> {
             mockGit.checkIsRepo.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-            const service = new GithubPagesService(createConfig());
+            const service = new GithubPagesService(createConfig({ pagesSourcePath: '', ...overrides }));
             await service.setupBranch();
             await service.deployPages();
             return service;
@@ -486,33 +489,39 @@ describe('GithubPagesService', () => {
 
         beforeEach(() => {
             ioMock.squash_after_days = 1;
+            remoteDefaultBranch = 'main';
             mockGit.checkIsRepo.mockReset();
-            mockGit.listRemote.mockResolvedValue('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n');
+            mockGit.listRemote.mockImplementation(
+                (async () => `ref: refs/heads/${remoteDefaultBranch}\tHEAD\nabc123\tHEAD\n`) as any,
+            );
             mockedReaddir.mockResolvedValue([]);
             mockedReadFile.mockReset();
+            // Default: last squash was well over a day ago, so a squash is due
+            mockedReadFile.mockResolvedValue(String(Date.now() - 3 * 24 * 60 * 60 * 1000));
             mockedWarning.mockClear();
+            mockedInfo.mockClear();
             mockedWriteFile.mockClear();
         });
 
         afterEach(() => {
             ioMock.squash_after_days = 0;
             mockGit.reset.mockImplementation((() => mockGit) as any);
+            mockGit.listRemote.mockReset();
+            mockGit.listRemote.mockResolvedValue('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n');
             vi.useRealTimers();
         });
 
         it('never squashes when squash_after_days is 0', async () => {
             ioMock.squash_after_days = 0;
-            mockedExistsSync.mockImplementation(markerMissing);
 
             await setupAndDeploy();
 
             expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(false);
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('squashes and pushes with a lease when the marker is missing', async () => {
-            mockedExistsSync.mockImplementation(markerMissing);
-
+        it('squashes and pushes with a lease when the last squash is old enough', async () => {
             await setupAndDeploy();
 
             expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
@@ -524,6 +533,28 @@ describe('GithubPagesService', () => {
             ]);
             expect(mockGit.reset).toHaveBeenCalledWith(['--soft', 'orphan123']);
             expect(mockGit.push).toHaveBeenCalledWith(...leasePush);
+            expect(mockedInfo).toHaveBeenCalledWith(squashedLog);
+        });
+
+        it('only starts the clock when the marker is missing', async () => {
+            mockedExistsSync.mockImplementation(markerMissing);
+
+            await setupAndDeploy();
+
+            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
+            expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+        });
+
+        it('restarts the clock when the marker is unreadable', async () => {
+            mockedReadFile.mockResolvedValue('not-a-timestamp');
+
+            await setupAndDeploy();
+
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Invalid'));
+            expect(mockedWriteFile.mock.calls.some(isMarkerWrite)).toBe(true);
+            expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
         it('squashes on the first deploy of the day and pushes normally later that day', async () => {
@@ -558,18 +589,8 @@ describe('GithubPagesService', () => {
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('treats an unreadable marker as due', async () => {
-            mockedReadFile.mockResolvedValue('not-a-timestamp');
-
-            await setupAndDeploy();
-
-            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Invalid'));
-            expect(mockGit.push).toHaveBeenCalledWith(...leasePush);
-        });
-
         it('does not squash a branch that is new on the remote', async () => {
             mockGit.fetch.mockResolvedValueOnce({ branches: [] });
-            mockedExistsSync.mockImplementation(markerMissing);
 
             await setupAndDeploy();
 
@@ -577,56 +598,66 @@ describe('GithubPagesService', () => {
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('re-decides after losing the race to a deploy that already squashed', async () => {
+        it('does not squash a new branch after a retry resets onto a parallel deploy', async () => {
             await retryOnce();
-            // First attempt: no marker yet. After the retry reset, the winner's fresh marker is on disk.
-            mockedExistsSync.mockImplementation(markerMissing);
-            mockGit.reset.mockImplementation(((args: string[]) => {
-                if (args[0] === '--hard') mockedExistsSync.mockReturnValue(true);
-                return mockGit;
-            }) as any);
-            mockedReadFile.mockResolvedValue(String(Date.now()));
-            mockGit.push.mockRejectedValueOnce(
-                new Error('! [rejected] gh-pages -> gh-pages (stale info)\nfailed to push some refs'),
-            );
+            mockGit.fetch.mockResolvedValueOnce({ branches: [] });
+            mockGit.push.mockRejectedValueOnce(new Error('! [rejected] gh-pages -> gh-pages (fetch first)'));
+
+            await setupAndDeploy();
+
+            expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages');
+        });
+
+        it('refuses to squash the default branch', async () => {
+            remoteDefaultBranch = 'gh-pages';
+
+            await setupAndDeploy();
+
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('default branch'));
+            expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+        });
+
+        it('refuses to squash a branch serving Pages from a subfolder', async () => {
+            await setupAndDeploy({ pagesSourcePath: 'docs' });
+
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining("'/docs'"));
+            expect(mockGit.raw).not.toHaveBeenCalled();
+            expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
+        });
+
+        it.each([
+            ['a lost race', '! [rejected] gh-pages -> gh-pages (stale info)'],
+            ['blocked force pushes', 'remote: error: GH013: Repository rule violations found'],
+            ['a network error', 'fatal: unable to access: RPC failed; HTTP 502'],
+        ])('skips the squash for the rest of the run after %s', async (_, message) => {
+            await retryOnce();
+            mockGit.push.mockRejectedValueOnce(new Error(message));
 
             await setupAndDeploy();
 
             expect(mockGit.push).toHaveBeenNthCalledWith(1, ...leasePush);
             expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages');
             expect(mockGit.raw).toHaveBeenCalledTimes(1);
-            expect(mockedWarning).not.toHaveBeenCalledWith(expect.stringContaining('falling back'));
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('skipping squash for this run'));
+            expect(mockedInfo).not.toHaveBeenCalledWith(squashedLog);
         });
 
-        it('falls back to a normal push when the squash push is blocked', async () => {
+        it('squashes with a lease when a squash becomes due after a retry', async () => {
             await retryOnce();
-            mockedExistsSync.mockImplementation(markerMissing);
-            mockGit.push.mockRejectedValueOnce(
-                new Error('remote: error: GH013: Repository rule violations found\nfailed to push some refs'),
-            );
+            // First attempt: squashed today already. After the retry reset, the remote holds an old marker.
+            mockedReadFile.mockResolvedValue(String(Date.now()));
+            mockGit.reset.mockImplementation(((args: string[]) => {
+                if (args[0] === '--hard') mockedReadFile.mockResolvedValue('0');
+                return mockGit;
+            }) as any);
+            mockGit.push.mockRejectedValueOnce(new Error('rejected'));
 
             await setupAndDeploy();
 
-            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('falling back to a normal push'));
-            expect(mockGit.push).toHaveBeenNthCalledWith(1, ...leasePush);
-            expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages');
-        });
-
-        it('refreshes the lease from the remote tip on retry', async () => {
-            await retryOnce();
-            mockedExistsSync.mockImplementation(markerMissing);
-            mockGit.revparse
-                .mockResolvedValueOnce('tip123\n') // setupBranch
-                .mockResolvedValueOnce('tree123\n') // first squash
-                .mockResolvedValueOnce('tip456\n') // after retry reset
-                .mockResolvedValueOnce('tree456\n'); // second squash
-            mockGit.push.mockRejectedValueOnce(new Error('! [rejected] (stale info)\nfailed to push some refs'));
-
-            await setupAndDeploy();
-
-            expect(mockGit.push).toHaveBeenNthCalledWith(2, 'origin', 'gh-pages', [
-                '--force-with-lease=gh-pages:tip456',
-            ]);
+            expect(mockGit.push).toHaveBeenNthCalledWith(1, 'origin', 'gh-pages');
+            expect(mockGit.push).toHaveBeenNthCalledWith(2, ...leasePush);
         });
     });
 });

@@ -1,4 +1,4 @@
-import { getInput, getBooleanInput, setSecret } from '@actions/core';
+import { getInput, getBooleanInput, setSecret, warning } from '@actions/core';
 import { join } from 'node:path';
 import os from 'node:os';
 function getTypedInput(name, required = false) {
@@ -27,7 +27,7 @@ const inputs = {
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
-    squash_after_days: Math.max(0, Number(getInput('squash_after_days')) || 0),
+    squash_after_days: squashAfterDays(),
     prefix: prefix(),
     fail_on_test_failure: getInput('fail_on_test_failure') === 'true',
     fileProcessingConcurrency: 10,
@@ -45,6 +45,17 @@ function prefix() {
         prefix = getInput('gh_artifact_prefix');
     }
     return prefix ? replaceWhiteSpace(prefix) : undefined;
+}
+/** Non-negative whole number of days; anything else disables squashing with a warning instead of guessing */
+function squashAfterDays() {
+    const raw = String(getTypedInput('squash_after_days')).trim();
+    if (raw === '')
+        return 0;
+    if (!/^\d+$/.test(raw)) {
+        warning(`Invalid squash_after_days '${raw}': expected a non-negative whole number of days. Squashing is disabled.`);
+        return 0;
+    }
+    return Number(raw);
 }
 function workspace() {
     return join(runtimeDir(), 'report');
