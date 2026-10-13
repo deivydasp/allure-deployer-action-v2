@@ -5,7 +5,8 @@ on:
     workflows: ["CI"]
     types: [completed]
 
-# Triggered automatically after CI completes (or manually).
+# Triggered automatically after CI completes (or manually). When triggered by CI it tests
+# the commit CI tested (workflow_run.head_sha), so a CI run on a branch tests that branch.
 # Attempt 1 deploys the report. A companion workflow (test-rerun-trigger.yml)
 # automatically reruns this workflow on completion. Attempt 2 verifies that
 # both attempts are detected via deploy.json metadata.
@@ -16,11 +17,17 @@ permissions:
 
 jobs:
   deploy:
-    # Skip if triggered by a failed CI run
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Skip if triggered by a failed CI run, or by a CI run on code from another repository (fork)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
+      # workflow_run always runs on the default branch; check out the commit CI tested instead
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Deploy report (attempt ${{ github.run_attempt }})
         id: deploy

@@ -18,7 +18,11 @@ npm run lint           # ESLint on src/
 
 A CI workflow (`.github/workflows/ci.yml`) runs automatically on push to master when source or config files change. It:
 1. Runs unit tests (`npm test`), validates the build (`tsc --noEmit`), and lint (`eslint`)
-2. Triggers all 9 integration test workflows (3 at a time via `max-parallel: 3`)
+2. Triggers all 9 integration test workflows (in dependent groups via `needs`)
+
+**Rerun Detection runs automatically after CI — don't trigger it by hand after a master CI run.** `test-rerun.yml` ("Test: Rerun Detection") starts on `workflow_run` when CI completes successfully, and `test-rerun-trigger.yml` then reruns it once so attempt 2 can verify rerun detection. So the full suite after CI is 9 integration workflows + 2 Rerun Detection runs (attempts 1 and 2).
+
+**Testing a non-master branch:** start CI with `gh workflow run ci.yml --ref <branch>`; Rerun Detection then follows automatically and tests the same commit (its checkout uses `workflow_run.head_sha`), so the branch gets the full suite with no manual trigger. Note `workflow_run` always takes the workflow *definitions* of `test-rerun.yml`/`test-rerun-trigger.yml` from master, so edits to those two files only take effect once merged.
 
 #### Unit Tests
 
