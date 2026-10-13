@@ -57,8 +57,7 @@ The build script does:
 1. `tsc` — compile TypeScript
 2. `ncc build` — bundle into `dist/main/index.js` with `allure` and `@allurereport/summary` as externals
 3. `ncc build` — bundle cleanup into `dist/cleanup/index.js`
-4. `node scripts/patch-dist-package.js` — adds `overrides: { "d3-time": "3" }` to `dist/main/package.json` to fix npm hoisting issue where d3-time@1.x gets hoisted over d3-time@3.x (breaking d3-scale)
-5. `npm install allure@^3.6.0` in `dist/main/` — installs the allure CLI and its dependency tree
+4. `npm install allure@^3.20.1` in `dist/main/` — installs the allure CLI and its dependency tree
 
 ## Architecture
 
@@ -71,8 +70,7 @@ Uses the **`allure` npm package (v3.x)** — a pure JavaScript CLI (no Java requ
 Key details:
 - **Config-driven**: `src/services/allure-report.service.ts` generates `allurerc.json` at runtime with plugin config, history path, and history limit
 - **CLI invocation**: `src/services/allure.service.ts` spawns `node cli.js` (resolved from the allure package) as a child process. Uses `AbortController` with a 5-minute timeout. Listens on `close` event (not `exit`) to ensure stdio streams are fully flushed before reading output.
-- **History**: Uses JSONL format (`history.jsonl`) stored on the gh-pages branch at `{prefix}/history/history.jsonl`. After shallow clone, history is already on disk. The `allure awesome` plugin reads/appends history via `--history-path` config. Post-generation, history is truncated to the `keep` limit and patched with the report URL for clickable history links. History is committed atomically with the report.
-- **History redirect**: Creates `awesome/index.html` redirect in single-plugin reports because Allure 3's awesome theme appends `/awesome` to history URLs
+- **History**: Uses JSONL format (`history.jsonl`) stored on the gh-pages branch at `{prefix}/history/history.jsonl`. After shallow clone, history is already on disk. Allure reads/appends history via the `historyPath` config and truncates it to `historyLimit` (the `keep` input) itself. History links come from `executor.json`'s `reportUrl`: allure stores it as each entry's `url` and links to `<url>#<test id>` (it only appends `awesome/index.html` when the URL ends with `/`, which ours never do). Allure 3.18.0–3.19.1 broke these links (allure3#1004), hence the `^3.20.1` minimum. History is committed atomically with the report.
 - **SPA crash regression test**: The `test-basic` workflow includes a Playwright smoke test that opens an individual test result and fails on JS errors. This guards against the kind of upstream regression seen in [allure-framework/allure3#571](https://github.com/allure-framework/allure3/issues/571) (now resolved), where 3.4–3.6 crashed with `Cannot read properties of undefined (reading 'message'/'payload')` when opening individual results. If a future allure version reintroduces a similar SPA crash, this test catches it before users do.
 
 ### Two Modes (src/main.ts)
@@ -138,8 +136,6 @@ src/
     ├── summary-table.ts                  # Summary table rendering (pie charts, dots, rerun columns)
     ├── util.ts                           # Retry logic, file helpers
     └── validate-results-paths.ts         # Input path validation
-scripts/
-    └── patch-dist-package.js             # Adds d3-time override to dist/main/package.json
 ```
 
 ### Key Modules

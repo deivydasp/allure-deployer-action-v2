@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Second deploy
+        id: deploy
         uses: ./
         with:
           allure_results_path: 'test-fixtures/passing'
@@ -43,6 +44,16 @@ jobs:
           fi
           echo "=== History content ==="
           cat test-history/history/history.jsonl
+          echo "=== Verify history links point to the deployed report ==="
+          # Allure writes these from executor.json's reportUrl; a trailing slash would make it link to /awesome/
+          REPORT_URL='${{ steps.deploy.outputs.report_url }}'
+          LAST_URL=$(tail -n 1 test-history/history/history.jsonl | jq -r '.url')
+          TEST_URLS=$(tail -n 1 test-history/history/history.jsonl | jq -r '[.testResults[].url] | unique | join(" ")')
+          echo "report_url=$REPORT_URL entry=$LAST_URL tests=$TEST_URLS"
+          if [ -z "$REPORT_URL" ] || [ "$LAST_URL" != "$REPORT_URL" ] || [ "$TEST_URLS" != "$REPORT_URL" ]; then
+            echo "::error::Latest history entry must link to $REPORT_URL"
+            exit 1
+          fi
           echo "=== Verify 2 report directories ==="
           DIRS=$(ls -d test-history/[0-9]* | wc -l)
           echo "Report directories: $DIRS"

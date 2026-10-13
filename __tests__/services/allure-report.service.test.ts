@@ -14,19 +14,15 @@ vi.mock('properties-reader', () => ({
 vi.mock('node:fs/promises', () => ({
     writeFile: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn(),
-    stat: vi.fn(),
     mkdir: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as fs from 'node:fs/promises';
-import { warning } from '@actions/core';
 import { propertiesReader } from 'properties-reader';
 
 const mockedWriteFile = vi.mocked(fs.writeFile);
 const mockedReadFile = vi.mocked(fs.readFile);
-const mockedStat = vi.mocked(fs.stat);
 const mockedMkdir = vi.mocked(fs.mkdir);
-const mockedWarning = vi.mocked(warning);
 const mockedPropertiesReader = vi.mocked(propertiesReader);
 
 function createMockRunner(exitCode = 0, stdout = '', stderr = ''): CommandRunner {
@@ -159,70 +155,17 @@ describe('Allure', () => {
             expect(config.plugins.awesome.options.groupBy).toEqual(['parentSuite', 'suite']);
         });
 
-        it('post-processes history: patches URL and truncates', async () => {
+        it('leaves history truncation, URLs and links to allure', async () => {
             const runner = createMockRunner();
-            const historyLines = [
-                '{"id":"1","name":"test1"}',
-                '{"id":"2","name":"test2"}',
-                '{"id":"3","name":"test3"}',
-            ].join('\n');
-            mockedReadFile.mockResolvedValueOnce(historyLines);
-            // stat for awesome dir — throw to indicate it doesn't exist
-            mockedStat.mockRejectedValue(new Error('ENOENT'));
-
-            const allure = new Allure({
-                allureRunner: runner,
-                config: createConfig({ historyLimit: 2 }),
-            });
+            const allure = new Allure({ allureRunner: runner, config: createConfig({ historyLimit: 2 }) });
 
             await allure.generate({ reportUrl: 'https://example.com/report' });
 
-            // Find the writeFile call for history
-            const historyCall = mockedWriteFile.mock.calls.find(
-                (call) => typeof call[0] === 'string' && call[0].includes('history.jsonl'),
-            );
-            expect(historyCall).toBeDefined();
-            const lines = (historyCall![1] as string).trimEnd().split('\n');
-            expect(lines).toHaveLength(2); // truncated to limit
-            const lastEntry = JSON.parse(lines[1]);
-            expect(lastEntry.url).toBe('https://example.com/report');
-        });
-
-        it('creates history redirect when awesome dir does not exist', async () => {
-            const runner = createMockRunner();
-            mockedReadFile.mockResolvedValueOnce('{"id":"1"}\n');
-            mockedStat.mockRejectedValue(new Error('ENOENT'));
-
-            const allure = new Allure({
-                allureRunner: runner,
-                config: createConfig(),
-            });
-
-            await allure.generate({ reportUrl: 'https://example.com' });
-
-            const redirectCall = mockedWriteFile.mock.calls.find(
-                (call) => typeof call[0] === 'string' && call[0].includes('awesome') && call[0].includes('index.html'),
-            );
-            expect(redirectCall).toBeDefined();
-            expect(redirectCall![1]).toContain('window.location.replace');
-        });
-
-        it('skips history redirect when awesome dir already exists (multi-plugin)', async () => {
-            const runner = createMockRunner();
-            mockedReadFile.mockResolvedValueOnce('{"id":"1"}\n');
-            mockedStat.mockResolvedValue({ isDirectory: () => true } as any);
-
-            const allure = new Allure({
-                allureRunner: runner,
-                config: createConfig(),
-            });
-
-            await allure.generate({ reportUrl: 'https://example.com' });
-
-            const redirectCall = mockedWriteFile.mock.calls.find(
-                (call) => typeof call[0] === 'string' && call[0].includes('awesome') && call[0].includes('index.html'),
-            );
-            expect(redirectCall).toBeUndefined();
+            const writtenPaths = mockedWriteFile.mock.calls.map((call) => String(call[0]));
+            expect(writtenPaths.some((path) => path.includes('history.jsonl'))).toBe(false);
+            expect(writtenPaths.some((path) => path.includes('awesome'))).toBe(false);
+            expect(mockedReadFile).not.toHaveBeenCalled();
+            expect(mockedMkdir).not.toHaveBeenCalled();
         });
     });
 
