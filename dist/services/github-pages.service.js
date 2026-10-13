@@ -9,13 +9,14 @@ import normalizeUrl from 'normalize-url';
 import inputs from '../io.js';
 import { allFulfilledResults, DEFAULT_RETRY_CONFIG, removeTrailingSlash, withRetry } from '../utilities/util.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
-const RETENTION_QUERY = `query($owner: String!, $repo: String!, $oid: GitObjectID!, $cutoff: GitTimestamp!, $olderUntil: GitTimestamp!, $cursor: String) {
+// No since/until filter: GitHub stops walking at the first commit older than `since`, so a single commit
+// with a skewed date would cut off every newer commit beneath it
+const RETENTION_QUERY = `query($owner: String!, $repo: String!, $oid: GitObjectID!, $cursor: String) {
   repository(owner: $owner, name: $repo) {
     id
     object(oid: $oid) {
       ... on Commit {
-        older: history(until: $olderUntil, first: 1) { totalCount }
-        kept: history(since: $cutoff, first: 100, after: $cursor) {
+        history(first: 100, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes { oid message tree { oid } author { name email date } committer { name email date } }
         }
@@ -119,9 +120,8 @@ export class GithubPagesService {
         const todayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS;
         const cutoffMs = todayStart - (inputs.commit_retention_days - 1) * DAY_MS;
         const cutoff = new Date(cutoffMs).toISOString();
-        const olderUntil = new Date(cutoffMs - 1000).toISOString();
         const octokit = getOctokit(this.token);
-        const kept = [];
+        const commits = [];
         let repositoryId = '';
         let cursor = null;
         do {
@@ -129,19 +129,23 @@ export class GithubPagesService {
                 owner: this.owner,
                 repo: this.repo,
                 oid: head,
-                cutoff,
-                olderUntil,
                 cursor,
             });
             const commit = result.repository.object;
             if (!commit)
                 throw new Error(`commit ${head} not found on the remote`);
-            if (commit.older.totalCount === 0)
-                return;
             repositoryId = result.repository.id;
-            kept.push(...commit.kept.nodes);
-            cursor = commit.kept.pageInfo.hasNextPage ? commit.kept.pageInfo.endCursor : null;
+            commits.push(...commit.history.nodes);
+            cursor = commit.history.pageInfo.hasNextPage ? commit.history.pageInfo.endCursor : null;
         } while (cursor);
+        // Cut below the oldest-positioned commit made since the cutoff, so an out-of-order date in between
+        // never drops newer commits; the branch is linear because pushes are always replayed on the tip
+        let lastKept = commits.length - 1;
+        while (lastKept >= 0 && Date.parse(commits[lastKept].committer.date) < cutoffMs)
+            lastKept--;
+        if (lastKept < 0 || lastKept === commits.length - 1)
+            return;
+        const kept = commits.slice(0, lastKept + 1);
         // history() lists newest first; rebuild oldest first on a new root
         let parent;
         for (const node of kept.reverse()) {

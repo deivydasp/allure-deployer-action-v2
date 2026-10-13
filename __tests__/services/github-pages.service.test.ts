@@ -481,16 +481,15 @@ describe('GithubPagesService', () => {
             committer: { name: 'ci', email: 'ci@x', date },
         });
 
-        /** One page of the retention query: `older` commits before the cutoff, `kept` newest first */
-        const page = (older: number, kept: ReturnType<typeof node>[], endCursor: string | null = null) => ({
+        /** One page of the branch history, newest first */
+        const page = (nodes: ReturnType<typeof node>[], endCursor: string | null = null) => ({
             repository: {
                 id: 'repo-id',
-                object: {
-                    older: { totalCount: older },
-                    kept: { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes: kept },
-                },
+                object: { history: { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes } },
             },
         });
+
+        const createdTrees = () => mockOctokit.rest.git.createCommit.mock.calls.map(([args]) => [args.tree, args.parents]);
 
         const queryCalls = () => mockOctokit.graphql.mock.calls.filter(([q]) => String(q).startsWith('query'));
         const mutationCalls = () => mockOctokit.graphql.mock.calls.filter(([q]) => String(q).includes('updateRefs'));
@@ -534,13 +533,15 @@ describe('GithubPagesService', () => {
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
         });
 
-        it('08:00 drops the commits from 7 days ago, keeping newer ones oldest first on a new root', async () => {
+        it('08:00 drops both commits from 7 days ago, keeping newer ones oldest first on a new root', async () => {
             mockOctokit.graphql
                 .mockResolvedValueOnce(
-                    page(2, [
+                    page([
                         node('tip123', '2026-10-12T08:00:00Z'),
                         node('d1', '2026-10-11T09:00:00Z'),
                         node('d6', '2026-10-06T09:00:00Z'),
+                        node('d7b', '2026-10-05T13:00:00Z'),
+                        node('d7a', '2026-10-05T07:00:00Z'),
                     ]),
                 )
                 .mockResolvedValueOnce({});
@@ -549,20 +550,15 @@ describe('GithubPagesService', () => {
 
             // Normal push first — never forced
             expect(mockGit.push).toHaveBeenCalledWith('origin', 'gh-pages');
-            // Cutoff = start of the UTC day 6 days ago: today plus the 6 previous days are kept
-            expect(queryCalls()[0][1]).toMatchObject({
-                oid: 'tip123',
-                cutoff: '2026-10-06T00:00:00.000Z',
-                olderUntil: '2026-10-05T23:59:59.000Z',
-            });
+            expect(queryCalls()[0][1]).toMatchObject({ oid: 'tip123', cursor: null });
 
-            const created = mockOctokit.rest.git.createCommit.mock.calls.map(([args]) => args);
-            expect(created.map((c) => [c.tree, c.parents])).toEqual([
+            // Cutoff = start of the UTC day 6 days ago: today plus the 6 previous days are kept
+            expect(createdTrees()).toEqual([
                 ['tree-d6', []],
                 ['tree-d1', ['new-tree-d6']],
                 ['tree-tip123', ['new-tree-d1']],
             ]);
-            expect(created[0]).toMatchObject({
+            expect(mockOctokit.rest.git.createCommit.mock.calls[0][0]).toMatchObject({
                 message: 'Allure report d6',
                 author: { name: 'ci', email: 'ci@x', date: '2026-10-06T09:00:00Z' },
                 committer: { name: 'ci', email: 'ci@x', date: '2026-10-06T09:00:00Z' },
@@ -578,7 +574,9 @@ describe('GithubPagesService', () => {
 
         it('16:00 finds nothing older and only does the normal push', async () => {
             vi.setSystemTime(new Date('2026-10-12T16:00:00Z'));
-            mockOctokit.graphql.mockResolvedValueOnce(page(0, [node('tip123', '2026-10-12T16:00:00Z')]));
+            mockOctokit.graphql.mockResolvedValueOnce(
+                page([node('tip123', '2026-10-12T16:00:00Z'), node('d6', '2026-10-06T09:00:00Z')]),
+            );
 
             await setupAndDeploy();
 
@@ -590,29 +588,65 @@ describe('GithubPagesService', () => {
 
         it('with 1 keeps only today', async () => {
             ioMock.commit_retention_days = 1;
-            mockOctokit.graphql.mockResolvedValueOnce(page(0, []));
+            mockOctokit.graphql
+                .mockResolvedValueOnce(page([node('tip123', '2026-10-12T08:00:00Z'), node('d1', '2026-10-11T23:59:59Z')]))
+                .mockResolvedValueOnce({});
 
             await setupAndDeploy();
 
-            expect(queryCalls()[0][1]).toMatchObject({ cutoff: '2026-10-12T00:00:00.000Z' });
+            expect(createdTrees()).toEqual([['tree-tip123', []]]);
         });
 
-        it('pages through more than 100 kept commits', async () => {
+        it('pages through more than 100 commits', async () => {
             mockOctokit.graphql
-                .mockResolvedValueOnce(page(5, [node('tip123', '2026-10-12T08:00:00Z')], 'cursor-1'))
-                .mockResolvedValueOnce(page(5, [node('d3', '2026-10-09T09:00:00Z')]))
+                .mockResolvedValueOnce(
+                    page([node('tip123', '2026-10-12T08:00:00Z'), node('d3', '2026-10-09T09:00:00Z')], 'cursor-1'),
+                )
+                .mockResolvedValueOnce(page([node('d6', '2026-10-06T09:00:00Z'), node('d9', '2026-10-03T09:00:00Z')]))
                 .mockResolvedValueOnce({});
 
             await setupAndDeploy();
 
             expect(queryCalls()[1][1]).toMatchObject({ cursor: 'cursor-1' });
-            const created = mockOctokit.rest.git.createCommit.mock.calls.map(([args]) => args.tree);
-            expect(created).toEqual(['tree-d3', 'tree-tip123']);
+            expect(createdTrees().map(([tree]) => tree)).toEqual(['tree-d6', 'tree-d3', 'tree-tip123']);
+        });
+
+        it('never drops newer commits that sit below one with an out-of-order date', async () => {
+            mockOctokit.graphql
+                .mockResolvedValueOnce(
+                    page([
+                        node('tip123', '2026-10-12T08:00:00Z'),
+                        node('d1', '2026-10-11T09:00:00Z'),
+                        node('skewed', '2026-09-01T09:00:00Z'),
+                        node('d2', '2026-10-10T09:00:00Z'),
+                        node('d9', '2026-10-03T09:00:00Z'),
+                    ]),
+                )
+                .mockResolvedValueOnce({});
+
+            await setupAndDeploy();
+
+            expect(createdTrees().map(([tree]) => tree)).toEqual(['tree-d2', 'tree-skewed', 'tree-d1', 'tree-tip123']);
+        });
+
+        it('does nothing when only an out-of-order commit is older than the cutoff', async () => {
+            mockOctokit.graphql.mockResolvedValueOnce(
+                page([
+                    node('tip123', '2026-10-12T08:00:00Z'),
+                    node('skewed', '2026-09-01T09:00:00Z'),
+                    node('d2', '2026-10-10T09:00:00Z'),
+                ]),
+            );
+
+            await setupAndDeploy();
+
+            expect(mockOctokit.rest.git.createCommit).not.toHaveBeenCalled();
+            expect(mutationCalls()).toHaveLength(0);
         });
 
         it('skips with a warning when another deploy moved the branch meanwhile', async () => {
             mockOctokit.graphql
-                .mockResolvedValueOnce(page(2, [node('tip123', '2026-10-12T08:00:00Z')]))
+                .mockResolvedValueOnce(page([node('tip123', '2026-10-12T08:00:00Z'), node('d9', '2026-10-03T09:00:00Z')]))
                 .mockRejectedValueOnce(new Error('Expected refs/heads/gh-pages to point to tip123'));
 
             await expect(setupAndDeploy()).resolves.toBeUndefined();
@@ -656,11 +690,19 @@ describe('GithubPagesService', () => {
 
         it('keeps the cutoff stable until the UTC day ends', async () => {
             vi.setSystemTime(new Date(Date.parse('2026-10-12T00:00:00Z') + DAY - 1));
-            mockOctokit.graphql.mockResolvedValueOnce(page(0, []));
+            mockOctokit.graphql
+                .mockResolvedValueOnce(
+                    page([
+                        node('tip123', '2026-10-12T23:59:59Z'),
+                        node('d6', '2026-10-06T00:00:00Z'),
+                        node('d7', '2026-10-05T23:59:59Z'),
+                    ]),
+                )
+                .mockResolvedValueOnce({});
 
             await setupAndDeploy();
 
-            expect(queryCalls()[0][1]).toMatchObject({ cutoff: '2026-10-06T00:00:00.000Z' });
+            expect(createdTrees().map(([tree]) => tree)).toEqual(['tree-d6', 'tree-tip123']);
         });
     });
 

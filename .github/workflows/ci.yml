@@ -58,3 +58,8 @@ jobs:
   test-multi-runner:
     needs: [test-history, test-keep-limit]
     uses: ./.github/workflows/test-multi-runner.yml
+
+  # Group 4: rewrites gh-pages history, so it runs alone after every other deploy
+  test-commit-retention:
+    needs: [test-parallel, test-multi-runner]
+    uses: ./.github/workflows/test-commit-retention.yml

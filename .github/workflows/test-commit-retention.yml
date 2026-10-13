@@ -1,0 +1,91 @@
+name: "Test: Commit Retention"
+on:
+  workflow_dispatch:
+  workflow_call:
+
+# Rewrites this repo's gh-pages history (never its files), so CI runs it alone after every other deploy test.
+
+permissions:
+  contents: write
+  pages: read
+
+env:
+  GH_REPO: ${{ github.repository }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  prune-then-noop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Seed gh-pages history with dated commits
+        run: bash .github/scripts/seed-retention-history.sh
+
+      - name: Deploy (first of the day, prunes)
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-retention'
+          report_name: 'Commit Retention Test'
+          commit_retention_days: '7'
+
+      - name: Verify old commits dropped, newer commits and all files kept
+        run: bash .github/scripts/verify-retention-history.sh 4 1 test-retention/_latest
+
+      - name: Deploy again (later the same day, nothing to prune)
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'test-retention'
+          report_name: 'Commit Retention Test'
+          commit_retention_days: '7'
+
+      - name: Verify the second deploy only added a commit on top
+        run: |
+          previous_tip=$(cat retention-tip.txt)
+          bash .github/scripts/verify-retention-history.sh 5 2 test-retention/_latest
+          parent=$(sed -n 2p retention-history.txt | cut -d' ' -f1)
+          if [ "$parent" != "$previous_tip" ]; then
+            echo "::error::Kept commits were rewritten again: expected parent $previous_tip, got $parent"
+            exit 1
+          fi
+          echo "OK: earlier commits unchanged ($previous_tip)"
+
+  reseed:
+    needs: prune-then-noop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Seed gh-pages history with dated commits
+        run: bash .github/scripts/seed-retention-history.sh
+
+  concurrent-deploy:
+    needs: reseed
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        prefix: [test-retention-a, test-retention-b]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy ${{ matrix.prefix }}
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: ${{ matrix.prefix }}
+          report_name: 'Commit Retention Test'
+          summary: 'false'
+          commit_retention_days: '7'
+
+  verify-concurrent:
+    needs: concurrent-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # One deploy prunes; the other either lands on top of the pruned history or loses the ref race and
+      # leaves pruning to the last push. Either way both deploys are kept and the old commits are gone.
+      - name: Verify both deploys survived and the old commits are gone
+        run: |
+          # Recomputed: the seed ran in another job minutes ago, so it is the same date
+          export SKEWED_DATE="$(date -u -d '60 days ago' +%F)T12:00:00Z"
+          bash .github/scripts/verify-retention-history.sh 5 2 test-retention-a/_latest test-retention-b/_latest
