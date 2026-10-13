@@ -60,7 +60,7 @@ inputs:
     description: "Number of test reports you want to keep alive"
     default: '10'
   commit_retention_days:
-    description: "Keep only the GitHub Pages branch commits from the last N calendar days (UTC, today included); older commits are dropped after the deploy. With 7, the first deploy of a day removes the commits made 7 days ago, and later deploys that day find nothing to remove. Kept commits retain their authors and dates; report files and history are never touched. The rewrite happens on GitHub's side via the API (nothing is re-uploaded) and only if the branch still points at the commit just pushed, so concurrent deploys are never lost. Only applies to a dedicated Pages branch served from the root: ignored for the default branch or a /docs source. Must be a whole number; 0 disables it."
+    description: "Keep only the GitHub Pages branch commits from the last N calendar days (UTC, today included); older commits are dropped after the deploy. With 7, the first deploy of a day removes the commits made 7 days ago, and later deploys that day find nothing to remove. Kept commits retain their authors and dates; report files are never touched. The rewrite happens on GitHub's side via the API (nothing is re-uploaded) and only if the branch still points at the commit just pushed, so concurrent deploys are never lost. Only applies to a dedicated Pages branch served from the root: ignored for the default branch or a /docs source. Must be a whole number; 0 disables it."
     default: '0'
   fail_on_test_failure:
     description: "Fail the action after deployment if any tests failed or broken. Report is always deployed first."
