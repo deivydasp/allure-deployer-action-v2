@@ -120,3 +120,23 @@ export function buildSummaryTable(rows: SummaryRow[]): string {
     const tableRows = rows.map((r) => buildRow(r, showFirstColumn, rerunAttempts)).join('\n');
     return `${header}\n${separator}\n${tableRows}`;
 }
+
+/**
+ * Renders a table from buildSummaryTable as HTML with cellpadding, for PR comments: GitHub's
+ * notification emails drop its table CSS, so a markdown table arrives with its cells run together.
+ * GitHub keeps cellpadding but strips border and style, so spacing is the most an email can get.
+ */
+export function toHtmlTable(markdownTable: string): string {
+    const cells = (line: string) =>
+        line
+            .split('|')
+            .slice(1, -1)
+            // Markdown is not parsed inside an HTML table
+            .map((cell) => cell.trim().replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'));
+    const [header, , ...rows] = markdownTable.split('\n');
+    const tr = (line: string, tag: 'th' | 'td') =>
+        `<tr>${cells(line)
+            .map((c) => `<${tag}>${c}</${tag}>`)
+            .join('')}</tr>`;
+    return `<table cellpadding="6">${tr(header, 'th')}${rows.map((r) => tr(r, 'td')).join('')}</table>`;
+}

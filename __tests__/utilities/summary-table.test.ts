@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSummaryTable, SummaryRow } from '../../src/utilities/summary-table.js';
+import { buildSummaryTable, SummaryRow, toHtmlTable } from '../../src/utilities/summary-table.js';
 
 describe('buildSummaryTable', () => {
     const baseStats = { passed: 10, failed: 2, broken: 1, skipped: 3, unknown: 0 };
@@ -228,5 +228,28 @@ describe('buildSummaryTable', () => {
         const lines = table.split('\n');
         const missingRow = lines.find((l) => l.includes('Missing'));
         expect(missingRow).toContain('—');
+    });
+});
+
+describe('toHtmlTable', () => {
+    it('renders the markdown table as an HTML table with cellpadding', () => {
+        const html = toHtmlTable(
+            buildSummaryTable([
+                {
+                    reportName: 'Unit Tests',
+                    reportUrl: 'https://example.com/report',
+                    stats: { passed: 3, failed: 1, broken: 0, skipped: 0, unknown: 0 },
+                    duration: 5000,
+                },
+            ]),
+        );
+
+        expect(html.startsWith('<table cellpadding="6">')).toBe(true);
+        expect(html).toContain('<tr><th></th><th>Name</th><th>Duration</th><th>Stats</th><th>Total</th><th>Report</th></tr>');
+        expect(html).toContain('<td><b>Unit Tests</b></td><td>5s</td>');
+        expect(html).toContain('<td>4</td><td><a href="https://example.com/report">View</a></td></tr>');
+        expect(html).not.toContain('|-');
+        expect(html).not.toContain('**');
+        expect(html).not.toContain('\n');
     });
 });

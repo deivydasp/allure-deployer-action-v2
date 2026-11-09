@@ -3,7 +3,7 @@ import { GithubInterface } from '../interfaces/github.interface.js';
 import { NotificationData } from '../interfaces/notification-data.js';
 import { Notifier } from '../interfaces/notifier.interface.js';
 import { GitHubService } from '../services/github.service.js';
-import { buildSummaryTable } from '../utilities/summary-table.js';
+import { buildSummaryTable, toHtmlTable } from '../utilities/summary-table.js';
 
 export type GitHubNotifierConfig = {
     client: GithubInterface;
@@ -41,6 +41,7 @@ export class GitHubNotifier implements Notifier {
                 reruns: data.reruns,
             },
         ]);
+        // The Summary Page link goes to the job summary only; a PR comment covers just this PR's report
         const message = data.summaryPageUrl
             ? `<img src="https://raw.githubusercontent.com/deivydasp/allure-deployer-action-v2/master/assets/allure-logo.png" alt="allure" align="absmiddle" />&nbsp;&nbsp;<a href="${data.summaryPageUrl}">Summary Page</a>\n\n${table}`
             : table;
@@ -62,7 +63,7 @@ export class GitHubNotifier implements Notifier {
             } else {
                 promises.push(
                     this.client.updatePr({
-                        message,
+                        message: toHtmlTable(table),
                         token: this.token,
                         prNumber: this.prNumber,
                         commentKey: this.commentKey,
