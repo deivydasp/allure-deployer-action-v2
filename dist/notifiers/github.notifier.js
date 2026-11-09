@@ -1,5 +1,5 @@
 import { info, warning } from '@actions/core';
-import { buildSummaryTable } from '../utilities/summary-table.js';
+import { buildSummaryTable, toHtmlTable } from '../utilities/summary-table.js';
 export class GitHubNotifier {
     client;
     prNumber;
@@ -45,7 +45,7 @@ export class GitHubNotifier {
             }
             else {
                 promises.push(this.client.updatePr({
-                    message: table,
+                    message: toHtmlTable(table),
                     token: this.token,
                     prNumber: this.prNumber,
                     commentKey: this.commentKey,

@@ -3,7 +3,7 @@ import { GithubInterface } from '../interfaces/github.interface.js';
 import { NotificationData } from '../interfaces/notification-data.js';
 import { Notifier } from '../interfaces/notifier.interface.js';
 import { GitHubService } from '../services/github.service.js';
-import { buildSummaryTable } from '../utilities/summary-table.js';
+import { buildSummaryTable, toHtmlTable } from '../utilities/summary-table.js';
 
 export type GitHubNotifierConfig = {
     client: GithubInterface;
@@ -63,7 +63,7 @@ export class GitHubNotifier implements Notifier {
             } else {
                 promises.push(
                     this.client.updatePr({
-                        message: table,
+                        message: toHtmlTable(table),
                         token: this.token,
                         prNumber: this.prNumber,
                         commentKey: this.commentKey,

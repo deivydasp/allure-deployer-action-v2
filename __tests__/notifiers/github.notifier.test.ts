@@ -165,6 +165,7 @@ describe('GitHubNotifier', () => {
         expect(prMessage).not.toContain('Summary Page');
         expect(prMessage).not.toContain('https://example.com/summary');
         expect(prMessage).toContain('https://example.com/report');
+        expect(prMessage.startsWith('<table cellpadding="6">')).toBe(true);
     });
 
     it('handles rejection gracefully', async () => {
