@@ -42,8 +42,17 @@ jobs:
   test-no-history:
     needs: build
     uses: ./.github/workflows/test-no-history.yml
+
+  # Group 2: after group 1 completes (reduces push contention)
+  test-history:
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    uses: ./.github/workflows/test-history.yml
+  test-keep-limit:
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    uses: ./.github/workflows/test-keep-limit.yml
   test-pr-comment:
-    needs: build
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    # In group 2, not 1: its three deploys alongside four others exhausted test-basic's push retries.
     # A called workflow gets at most its caller's permissions, so issues: write is granted here;
     # setting permissions on a job drops the rest, hence repeating the workflow-level two
     permissions:
@@ -52,20 +61,12 @@ jobs:
       issues: write
     uses: ./.github/workflows/test-pr-comment.yml
 
-  # Group 2: after group 1 completes (reduces push contention)
-  test-history:
-    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history, test-pr-comment]
-    uses: ./.github/workflows/test-history.yml
-  test-keep-limit:
-    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history, test-pr-comment]
-    uses: ./.github/workflows/test-keep-limit.yml
-
   # Group 3: slower tests run last
   test-parallel:
-    needs: [test-history, test-keep-limit]
+    needs: [test-history, test-keep-limit, test-pr-comment]
     uses: ./.github/workflows/test-parallel-deploy.yml
   test-multi-runner:
-    needs: [test-history, test-keep-limit]
+    needs: [test-history, test-keep-limit, test-pr-comment]
     uses: ./.github/workflows/test-multi-runner.yml
 
   # Group 4: rewrites gh-pages history, so it runs alone after every other deploy
