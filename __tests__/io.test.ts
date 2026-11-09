@@ -38,3 +38,31 @@ describe('commit_retention_days input', () => {
         expect(warning).toHaveBeenCalledWith(expect.stringContaining('Invalid commit_retention_days'));
     });
 });
+
+async function loadPrNumber(value: string): Promise<number | undefined> {
+    rawInputs.pr_number = value;
+    vi.resetModules();
+    return (await import('../src/io.js')).default.pr_number;
+}
+
+describe('pr_number input', () => {
+    beforeEach(() => {
+        vi.mocked(warning).mockClear();
+        // Left behind by the commit_retention_days cases, whose invalid values warn on import
+        delete rawInputs.commit_retention_days;
+    });
+
+    it.each([
+        ['', undefined],
+        ['42', 42],
+        [' 1473 ', 1473],
+    ])('accepts %j as %j', async (value, expected) => {
+        expect(await loadPrNumber(value)).toBe(expected);
+        expect(warning).not.toHaveBeenCalled();
+    });
+
+    it.each(['0', '#42', '4.2', '-1', 'abc'])('ignores %j with a warning', async (value) => {
+        expect(await loadPrNumber(value)).toBeUndefined();
+        expect(warning).toHaveBeenCalledWith(expect.stringContaining('Invalid pr_number'));
+    });
+});

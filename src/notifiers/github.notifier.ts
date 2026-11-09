@@ -1,4 +1,4 @@
-import { warning } from '@actions/core';
+import { info, warning } from '@actions/core';
 import { GithubInterface } from '../interfaces/github.interface.js';
 import { NotificationData } from '../interfaces/notification-data.js';
 import { Notifier } from '../interfaces/notifier.interface.js';
@@ -10,6 +10,8 @@ export type GitHubNotifierConfig = {
     prNumber?: number;
     token?: string;
     prComment?: boolean;
+    /** Identifies this report's PR comment across runs; defaults to 'default' */
+    commentKey?: string;
     writeSummary?: boolean;
 };
 
@@ -18,12 +20,14 @@ export class GitHubNotifier implements Notifier {
     prNumber?: number;
     token?: string;
     prComment?: boolean;
+    commentKey: string;
     writeSummary: boolean;
-    constructor({ client, prNumber, prComment, token, writeSummary }: GitHubNotifierConfig) {
+    constructor({ client, prNumber, prComment, token, commentKey, writeSummary }: GitHubNotifierConfig) {
         this.client = client;
         this.prNumber = prNumber;
         this.token = token;
         this.prComment = prComment;
+        this.commentKey = commentKey || 'default';
         this.writeSummary = writeSummary ?? true;
     }
 
@@ -48,8 +52,23 @@ export class GitHubNotifier implements Notifier {
         if (data.summaryPageUrl) {
             promises.push(this.client.updateOutput({ name: 'summary_page_url', value: data.summaryPageUrl }));
         }
-        if (this.token && this.prComment && this.prNumber) {
-            promises.push(this.client.updatePr({ message, token: this.token, prNumber: this.prNumber }));
+        if (this.prComment) {
+            if (!this.prNumber) {
+                info(
+                    'Skipping PR comment: no pull request number. Set the pr_number input when the workflow is not triggered by a pull_request event.',
+                );
+            } else if (!this.token) {
+                info('Skipping PR comment: no github_token.');
+            } else {
+                promises.push(
+                    this.client.updatePr({
+                        message,
+                        token: this.token,
+                        prNumber: this.prNumber,
+                        commentKey: this.commentKey,
+                    }),
+                );
+            }
         }
         if (this.writeSummary) {
             promises.push(this.client.updateSummary(message));

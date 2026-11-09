@@ -1,0 +1,103 @@
+name: "Test: PR Comment"
+on:
+  workflow_dispatch:
+  workflow_call:
+
+# issues: write to open the throwaway issue and comment on it. The action comments through the
+# issue-comment API, which serves issues and pull requests alike, so an issue stands in for a PR
+# without needing a branch, a PR, or the "Allow GitHub Actions to create pull requests" setting.
+permissions:
+  contents: write
+  pages: read
+  issues: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MARKER_A: '<!-- allure-deployer-action:pr-comment-a -->'
+      MARKER_B: '<!-- allure-deployer-action:pr-comment-b -->'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Open throwaway issue
+        id: issue
+        run: |
+          number=$(gh api "repos/${{ github.repository }}/issues" \
+            -f title="PR comment test (run ${{ github.run_id }})" \
+            -f body="Opened by the 'Test: PR Comment' workflow; closed automatically when it finishes." \
+            --jq .number)
+          echo "Opened issue #${number}"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      # workflow_dispatch/workflow_call carry no PR, so this also proves pr_number overrides the event
+      - name: First deploy (prefix A)
+        id: first
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'pr-comment-a'
+          report_name: 'PR Comment Test A'
+          pr_number: ${{ steps.issue.outputs.number }}
+
+      - name: Second deploy (prefix A again, should edit the first comment)
+        id: second
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'pr-comment-a'
+          report_name: 'PR Comment Test A'
+          pr_number: ${{ steps.issue.outputs.number }}
+
+      - name: Third deploy (prefix B, should get its own comment)
+        id: third
+        uses: ./
+        with:
+          allure_results_path: 'test-fixtures/passing'
+          prefix: 'pr-comment-b'
+          report_name: 'PR Comment Test B'
+          pr_number: ${{ steps.issue.outputs.number }}
+
+      - name: Verify one comment per prefix, edited in place
+        env:
+          ISSUE: ${{ steps.issue.outputs.number }}
+          FIRST_URL: ${{ steps.first.outputs.report_url }}
+          SECOND_URL: ${{ steps.second.outputs.report_url }}
+          THIRD_URL: ${{ steps.third.outputs.report_url }}
+        run: |
+          gh api --paginate "repos/${{ github.repository }}/issues/${ISSUE}/comments" --jq '.[]' \
+            | jq -s . > comments.json
+          echo "=== $(jq length comments.json) comment(s) on issue #${ISSUE} ==="
+
+          fail() { echo "FAIL: $1"; exit 1; }
+          test -n "$FIRST_URL" && test -n "$SECOND_URL" && test -n "$THIRD_URL" || fail "a deploy step produced no report_url"
+          [ "$FIRST_URL" != "$SECOND_URL" ] || fail "first and second deploy share a report URL, so the edit cannot be told apart"
+
+          a_count=$(jq --arg m "$MARKER_A" '[.[] | select(.body | contains($m))] | length' comments.json)
+          b_count=$(jq --arg m "$MARKER_B" '[.[] | select(.body | contains($m))] | length' comments.json)
+          [ "$a_count" = 1 ] && echo "OK: exactly one comment for prefix A" || fail "expected 1 comment for prefix A, found $a_count"
+          [ "$b_count" = 1 ] && echo "OK: exactly one comment for prefix B" || fail "expected 1 comment for prefix B, found $b_count"
+
+          # On a re-run (attempt > 1) rerun detection makes the comment link the attempt-1 report
+          # instead, so which URL it shows is only predictable on the first attempt
+          if [ "${{ github.run_attempt }}" = 1 ]; then
+            a_body=$(jq -r --arg m "$MARKER_A" '.[] | select(.body | contains($m)) | .body' comments.json)
+            b_body=$(jq -r --arg m "$MARKER_B" '.[] | select(.body | contains($m)) | .body' comments.json)
+            grep -qF "$SECOND_URL" <<< "$a_body" && echo "OK: prefix A comment shows the second report" || fail "prefix A comment does not link the second report"
+            ! grep -qF "$FIRST_URL" <<< "$a_body" && echo "OK: prefix A comment no longer shows the first report" || fail "prefix A comment still links the first report"
+            grep -qF "$THIRD_URL" <<< "$b_body" && echo "OK: prefix B comment shows its report" || fail "prefix B comment does not link its report"
+          else
+            echo "SKIP: report URL checks (attempt ${{ github.run_attempt }})"
+          fi
+
+          edited=$(jq -r --arg m "$MARKER_A" '.[] | select(.body | contains($m)) | .updated_at > .created_at' comments.json)
+          [ "$edited" = true ] && echo "OK: prefix A comment was edited, not re-posted" || fail "prefix A comment was never edited"
+          echo "=== All checks passed ==="
+
+      - name: Close throwaway issue
+        if: always() && steps.issue.outputs.number
+        run: |
+          gh issue close "${{ steps.issue.outputs.number }}" -R "${{ github.repository }}" \
+            --reason "not planned" --comment "Closed by the 'Test: PR Comment' workflow." \
+            || echo "::warning::Could not close issue #${{ steps.issue.outputs.number }}"

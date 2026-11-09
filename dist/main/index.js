@@ -38588,6 +38588,7 @@ const inputs = {
     github_pages_branch: getInputOrUndefined('github_pages_branch'),
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
+    pr_number: prNumber(),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     commit_retention_days: commitRetentionDays(),
     prefix: prefix(),
@@ -38607,6 +38608,17 @@ function prefix() {
         prefix = getInput('gh_artifact_prefix');
     }
     return prefix ? replaceWhiteSpace(prefix) : undefined;
+}
+/** Positive whole number; anything else is ignored with a warning so the event's own PR number is used */
+function prNumber() {
+    const raw = getInput('pr_number').trim();
+    if (raw === '')
+        return undefined;
+    if (!/^\d+$/.test(raw) || Number(raw) < 1) {
+        warning(`Invalid pr_number '${raw}': expected a pull request number. Falling back to the event's pull request.`);
+        return undefined;
+    }
+    return Number(raw);
 }
 /** Non-negative whole number of days; anything else disables pruning with a warning instead of guessing */
 function commitRetentionDays() {
@@ -38751,12 +38763,14 @@ class GitHubNotifier {
     prNumber;
     token;
     prComment;
+    commentKey;
     writeSummary;
-    constructor({ client, prNumber, prComment, token, writeSummary }) {
+    constructor({ client, prNumber, prComment, token, commentKey, writeSummary }) {
         this.client = client;
         this.prNumber = prNumber;
         this.token = token;
         this.prComment = prComment;
+        this.commentKey = commentKey || 'default';
         this.writeSummary = writeSummary ?? true;
     }
     async notify(data) {
@@ -38779,8 +38793,21 @@ class GitHubNotifier {
         if (data.summaryPageUrl) {
             promises.push(this.client.updateOutput({ name: 'summary_page_url', value: data.summaryPageUrl }));
         }
-        if (this.token && this.prComment && this.prNumber) {
-            promises.push(this.client.updatePr({ message, token: this.token, prNumber: this.prNumber }));
+        if (this.prComment) {
+            if (!this.prNumber) {
+                info('Skipping PR comment: no pull request number. Set the pr_number input when the workflow is not triggered by a pull_request event.');
+            }
+            else if (!this.token) {
+                info('Skipping PR comment: no github_token.');
+            }
+            else {
+                promises.push(this.client.updatePr({
+                    message,
+                    token: this.token,
+                    prNumber: this.prNumber,
+                    commentKey: this.commentKey,
+                }));
+            }
         }
         if (this.writeSummary) {
             promises.push(this.client.updateSummary(message));
@@ -43773,18 +43800,35 @@ class GitHubService {
             warning(`Failed to set output '${name}': ${e}`);
         }
     }
-    async updatePr({ message, token, prNumber }) {
+    async updatePr({ message, token, prNumber, commentKey, }) {
+        const marker = prCommentMarker(commentKey);
+        const body = `${marker}\n${message}`;
+        const { owner, repo } = github_context.repo;
         try {
-            // Update the PR body
-            const work = async () => {
-                await getOctokit(token).rest.issues.createComment({
-                    owner: github_context.repo.owner,
-                    repo: github_context.repo.repo,
+            const octokit = getOctokit(token);
+            const existing = await withRetry(async () => {
+                const comments = await octokit.paginate(octokit.rest.issues.listComments, {
+                    owner,
+                    repo,
                     issue_number: prNumber,
-                    body: message,
+                    per_page: 100,
                 });
-            };
-            await withRetry(work, DEFAULT_RETRY_CONFIG);
+                // Only bodies that start with the marker: one merely quoting it is someone else's comment.
+                // Latest one wins if an earlier race ever left two.
+                return comments.filter((c) => c.body?.startsWith(marker)).pop();
+            }, DEFAULT_RETRY_CONFIG);
+            if (existing) {
+                try {
+                    await withRetry(() => octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body }), DEFAULT_RETRY_CONFIG);
+                    info(`Pull Request comment updated on PR #${prNumber}!`);
+                    return;
+                }
+                catch (e) {
+                    // e.g. the comment was written by another token's user, or deleted meanwhile
+                    warning(`Failed to update existing PR comment ${existing.id}, posting a new one: ${e}`);
+                }
+            }
+            await withRetry(() => octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body }), DEFAULT_RETRY_CONFIG);
             info(`Pull Request comment posted on PR #${prNumber}!`);
         }
         catch (e) {
@@ -43799,6 +43843,11 @@ class GitHubService {
             warning(`Failed to write job summary: ${e}`);
         }
     }
+}
+/** Hidden marker identifying this action's comment for one report, so a later run edits it instead of adding another */
+function prCommentMarker(commentKey) {
+    // `--` would end the HTML comment early
+    return `<!-- allure-deployer-action:${commentKey.replace(/-{2,}/g, '-')} -->`;
 }
 
 ;// CONCATENATED MODULE: ./dist/utilities/copy-files.js
@@ -44240,10 +44289,19 @@ async function copyReportToCustomDir(reportDir) {
 async function sendNotifications(data) {
     const notifiers = [new ConsoleNotifier()];
     const token = io.github_token;
-    const prNumber = github_context.payload.pull_request?.number;
+    const prNumber = io.pr_number ?? github_context.payload.pull_request?.number;
     const prComment = io.pr_comment;
+    // One comment per report: deploys with different prefixes (or report names) on one PR each keep their own
+    const commentKey = io.prefix ?? io.report_name;
     const githubNotifierClient = new GitHubService();
-    notifiers.push(new GitHubNotifier({ client: githubNotifierClient, token, prNumber, prComment, writeSummary: io.summary }));
+    notifiers.push(new GitHubNotifier({
+        client: githubNotifierClient,
+        token,
+        prNumber,
+        prComment,
+        commentKey,
+        writeSummary: io.summary,
+    }));
     await new NotifyHandler(notifiers).sendNotifications(data);
 }
 async function scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath) {

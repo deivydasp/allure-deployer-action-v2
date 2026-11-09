@@ -59,7 +59,20 @@ jobs:
     needs: [test-history, test-keep-limit]
     uses: ./.github/workflows/test-multi-runner.yml
 
-  # Group 4: rewrites gh-pages history, so it runs alone after every other deploy
-  test-commit-retention:
+  # Group 4: PR comment test, alone
+  test-pr-comment:
     needs: [test-parallel, test-multi-runner]
+    # Alone: its three back-to-back deploys next to other deploying jobs exhausted their push retries
+    # (test-basic in group 1, test-history in group 2).
+    # A called workflow gets at most its caller's permissions, so issues: write is granted here;
+    # setting permissions on a job drops the rest, hence repeating the workflow-level two
+    permissions:
+      contents: write
+      pages: read
+      issues: write
+    uses: ./.github/workflows/test-pr-comment.yml
+
+  # Group 5: rewrites gh-pages history, so it runs alone after every other deploy
+  test-commit-retention:
+    needs: [test-pr-comment]
     uses: ./.github/workflows/test-commit-retention.yml

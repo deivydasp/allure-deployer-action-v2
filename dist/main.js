@@ -283,10 +283,19 @@ async function copyReportToCustomDir(reportDir) {
 async function sendNotifications(data) {
     const notifiers = [new ConsoleNotifier()];
     const token = inputs.github_token;
-    const prNumber = github.context.payload.pull_request?.number;
+    const prNumber = inputs.pr_number ?? github.context.payload.pull_request?.number;
     const prComment = inputs.pr_comment;
+    // One comment per report: deploys with different prefixes (or report names) on one PR each keep their own
+    const commentKey = inputs.prefix ?? inputs.report_name;
     const githubNotifierClient = new GitHubService();
-    notifiers.push(new GitHubNotifier({ client: githubNotifierClient, token, prNumber, prComment, writeSummary: inputs.summary }));
+    notifiers.push(new GitHubNotifier({
+        client: githubNotifierClient,
+        token,
+        prNumber,
+        prComment,
+        commentKey,
+        writeSummary: inputs.summary,
+    }));
     await new NotifyHandler(notifiers).sendNotifications(data);
 }
 async function scanPrefixSummaries(rootDir, pagesUrl, pagesSourcePath) {

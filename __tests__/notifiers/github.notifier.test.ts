@@ -4,8 +4,11 @@ import { GithubInterface } from '../../src/interfaces/github.interface.js';
 import { NotificationData } from '../../src/interfaces/notification-data.js';
 
 vi.mock('@actions/core', () => ({
+    info: vi.fn(),
     warning: vi.fn(),
 }));
+
+import { info } from '@actions/core';
 
 function createMockClient(): GithubInterface {
     return {
@@ -52,6 +55,7 @@ describe('GitHubNotifier', () => {
             token: 'tok',
             prComment: true,
             prNumber: 42,
+            commentKey: 'api',
             writeSummary: false,
         });
 
@@ -61,7 +65,27 @@ describe('GitHubNotifier', () => {
             message: expect.any(String),
             token: 'tok',
             prNumber: 42,
+            commentKey: 'api',
         });
+    });
+
+    it('uses the default comment key when none is given', async () => {
+        const client = createMockClient();
+        const notifier = new GitHubNotifier({ client, token: 'tok', prComment: true, prNumber: 42, writeSummary: false });
+
+        await notifier.notify(baseData);
+
+        expect(client.updatePr).toHaveBeenCalledWith(expect.objectContaining({ commentKey: 'default' }));
+    });
+
+    it('logs why the PR comment is skipped when there is no PR number', async () => {
+        const client = createMockClient();
+        const notifier = new GitHubNotifier({ client, token: 'tok', prComment: true, writeSummary: false });
+
+        await notifier.notify(baseData);
+
+        expect(client.updatePr).not.toHaveBeenCalled();
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('no pull request number'));
     });
 
     it('does not post PR comment when prComment is false', async () => {

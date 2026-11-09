@@ -9,6 +9,7 @@ export interface Inputs {
     allure_results_path?: string;
     show_history: boolean;
     pr_comment: boolean;
+    pr_number?: number;
     custom_report_dir?: string;
 
     language?: string;

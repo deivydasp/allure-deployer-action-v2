@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GitHubService } from '../../src/services/github.service.js';
+import { GitHubService, prCommentMarker } from '../../src/services/github.service.js';
 
 vi.mock('@actions/core', () => ({
     info: vi.fn(),
@@ -52,35 +52,86 @@ describe('GitHubService', () => {
     });
 
     describe('updatePr', () => {
-        it('creates a comment on the PR', async () => {
-            const createComment = vi.fn().mockResolvedValue({});
-            mockedGetOctokit.mockReturnValue({
-                rest: {
-                    issues: { createComment },
-                },
-            } as any);
+        const marker = '<!-- allure-deployer-action:api -->';
 
-            await service.updatePr({ message: 'Test report', token: 'token123', prNumber: 42 });
+        function mockOctokit(existingComments: { id: number; body?: string }[] = []) {
+            const issues = {
+                listComments: vi.fn(),
+                createComment: vi.fn().mockResolvedValue({}),
+                updateComment: vi.fn().mockResolvedValue({}),
+            };
+            const paginate = vi.fn().mockResolvedValue(existingComments);
+            mockedGetOctokit.mockReturnValue({ paginate, rest: { issues } } as any);
+            return { issues, paginate };
+        }
 
-            expect(createComment).toHaveBeenCalledWith({
+        it('creates a marked comment when the PR has none for this report', async () => {
+            const { issues, paginate } = mockOctokit([{ id: 1, body: 'unrelated' }]);
+
+            await service.updatePr({ message: 'Test report', token: 'token123', prNumber: 42, commentKey: 'api' });
+
+            expect(paginate).toHaveBeenCalledWith(issues.listComments, expect.objectContaining({ issue_number: 42 }));
+            expect(issues.updateComment).not.toHaveBeenCalled();
+            expect(issues.createComment).toHaveBeenCalledWith({
                 owner: 'test-owner',
                 repo: 'test-repo',
                 issue_number: 42,
-                body: 'Test report',
+                body: `${marker}\nTest report`,
             });
         });
 
-        it('warns on failure instead of throwing', async () => {
-            mockedGetOctokit.mockReturnValue({
-                rest: {
-                    issues: {
-                        createComment: vi.fn().mockRejectedValue(new Error('API error')),
-                    },
-                },
-            } as any);
+        it('edits the latest earlier comment for the same report instead of posting another', async () => {
+            const { issues } = mockOctokit([
+                { id: 1, body: `${marker}\nold` },
+                { id: 2, body: '<!-- allure-deployer-action:ui -->\nother report' },
+                { id: 3, body: `${marker}\nnewer` },
+                { id: 4, body: `> quoting ${marker}\nby hand` },
+            ]);
 
-            await service.updatePr({ message: 'msg', token: 'tok', prNumber: 1 });
+            await service.updatePr({ message: 'Test report', token: 'tok', prNumber: 42, commentKey: 'api' });
+
+            expect(issues.createComment).not.toHaveBeenCalled();
+            expect(issues.updateComment).toHaveBeenCalledWith({
+                owner: 'test-owner',
+                repo: 'test-repo',
+                comment_id: 3,
+                body: `${marker}\nTest report`,
+            });
+        });
+
+        it('posts a new comment when editing the earlier one fails', async () => {
+            const { issues } = mockOctokit([{ id: 3, body: `${marker}\nold` }]);
+            issues.updateComment.mockRejectedValue(new Error('Forbidden'));
+
+            await service.updatePr({ message: 'Test report', token: 'tok', prNumber: 42, commentKey: 'api' });
+
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Failed to update existing PR comment 3'));
+            expect(issues.createComment).toHaveBeenCalled();
+        });
+
+        it('warns instead of throwing when the client cannot be created', async () => {
+            mockedGetOctokit.mockImplementationOnce(() => {
+                throw new Error('bad token');
+            });
+
+            await expect(
+                service.updatePr({ message: 'm', token: 't', prNumber: 1, commentKey: 'api' }),
+            ).resolves.toBeUndefined();
             expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Failed to update PR'));
+        });
+
+        it('warns on failure instead of throwing', async () => {
+            const { issues } = mockOctokit();
+            issues.createComment.mockRejectedValue(new Error('API error'));
+
+            await service.updatePr({ message: 'msg', token: 'tok', prNumber: 1, commentKey: 'api' });
+            expect(mockedWarning).toHaveBeenCalledWith(expect.stringContaining('Failed to update PR'));
+        });
+    });
+
+    describe('prCommentMarker', () => {
+        it('keeps the key from closing the HTML comment early', () => {
+            expect(prCommentMarker('a--b')).toBe('<!-- allure-deployer-action:a-b -->');
         });
     });
 
