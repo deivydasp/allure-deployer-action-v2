@@ -155,6 +155,18 @@ describe('GitHubNotifier', () => {
         expect(summaryCall).toContain('https://example.com/summary');
     });
 
+    it('leaves the summary page link out of the PR comment', async () => {
+        const client = createMockClient();
+        const notifier = new GitHubNotifier({ client, token: 'tok', prComment: true, prNumber: 42, writeSummary: false });
+
+        await notifier.notify({ ...baseData, summaryPageUrl: 'https://example.com/summary' });
+
+        const prMessage = vi.mocked(client.updatePr).mock.calls[0][0].message;
+        expect(prMessage).not.toContain('Summary Page');
+        expect(prMessage).not.toContain('https://example.com/summary');
+        expect(prMessage).toContain('https://example.com/report');
+    });
+
     it('handles rejection gracefully', async () => {
         const { warning } = await import('@actions/core');
         const client = createMockClient();
