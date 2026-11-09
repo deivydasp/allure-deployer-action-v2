@@ -42,13 +42,22 @@ jobs:
   test-no-history:
     needs: build
     uses: ./.github/workflows/test-no-history.yml
+  test-pr-comment:
+    needs: build
+    # A called workflow gets at most its caller's permissions, so issues: write is granted here;
+    # setting permissions on a job drops the rest, hence repeating the workflow-level two
+    permissions:
+      contents: write
+      pages: read
+      issues: write
+    uses: ./.github/workflows/test-pr-comment.yml
 
   # Group 2: after group 1 completes (reduces push contention)
   test-history:
-    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history, test-pr-comment]
     uses: ./.github/workflows/test-history.yml
   test-keep-limit:
-    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history]
+    needs: [test-basic, test-quality-gate, test-custom-prefix, test-no-history, test-pr-comment]
     uses: ./.github/workflows/test-keep-limit.yml
 
   # Group 3: slower tests run last

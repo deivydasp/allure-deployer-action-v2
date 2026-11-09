@@ -26,6 +26,7 @@ const inputs = {
     github_pages_branch: getInputOrUndefined('github_pages_branch'),
     github_pages_repo: getTypedInput('github_pages_repo'),
     pr_comment: getBooleanInput('pr_comment'),
+    pr_number: prNumber(),
     keep: Math.max(1, Number(getTypedInput('keep')) || 10),
     commit_retention_days: commitRetentionDays(),
     prefix: prefix(),
@@ -45,6 +46,17 @@ function prefix() {
         prefix = getInput('gh_artifact_prefix');
     }
     return prefix ? replaceWhiteSpace(prefix) : undefined;
+}
+/** Positive whole number; anything else is ignored with a warning so the event's own PR number is used */
+function prNumber() {
+    const raw = getInput('pr_number').trim();
+    if (raw === '')
+        return undefined;
+    if (!/^\d+$/.test(raw) || Number(raw) < 1) {
+        warning(`Invalid pr_number '${raw}': expected a pull request number. Falling back to the event's pull request.`);
+        return undefined;
+    }
+    return Number(raw);
 }
 /** Non-negative whole number of days; anything else disables pruning with a warning instead of guessing */
 function commitRetentionDays() {

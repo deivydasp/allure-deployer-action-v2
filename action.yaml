@@ -41,6 +41,9 @@ inputs:
   pr_comment:
     description: "Post test report information as pull request comment. Requires `github_token` to be set with permission"
     default: "true"
+  pr_number:
+    description: "Pull request to comment on. Defaults to the pull request in the event payload; set it when the workflow runs on another event (e.g. workflow_dispatch) for a known pull request."
+    required: false
   custom_report_dir:
     description: "A custom directory to generate Allure report into."
     required: false
