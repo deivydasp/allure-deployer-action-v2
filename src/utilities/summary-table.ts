@@ -110,8 +110,9 @@ export function buildSummaryTable(rows: SummaryRow[]): string {
         separator += `|-`;
     }
     for (const attempt of rerunAttempts) {
-        // Column "Rerun #(N-1)" represents GitHub runAttempt = N
-        header += ` | Rerun #${attempt - 1}`;
+        // Column "Rerun #(N-1)" represents GitHub runAttempt = N. A zero-width space after '#'
+        // keeps GitHub from turning "#1" into a link to issue/PR #1; it still reads "Rerun #1".
+        header += ` | Rerun #&#8203;${attempt - 1}`;
         separator += `|-`;
     }
     header += ` |`;

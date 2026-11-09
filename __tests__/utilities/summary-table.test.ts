@@ -49,8 +49,10 @@ describe('buildSummaryTable', () => {
         ];
         const table = buildSummaryTable(rows);
         expect(table).toContain('Original');
-        expect(table).toContain('Rerun #1');
-        expect(table).toContain('Rerun #2');
+        expect(table).toContain('Rerun #&#8203;1');
+        expect(table).toContain('Rerun #&#8203;2');
+        // A bare "#1" would be autolinked by GitHub to issue/PR #1
+        expect(table).not.toMatch(/Rerun #\d/);
         expect(table).toContain('https://example.com/rerun1');
         expect(table).toContain('https://example.com/rerun2');
     });
@@ -168,7 +170,7 @@ describe('buildSummaryTable', () => {
         ];
         const table = buildSummaryTable(rows);
         expect(table).not.toContain('Original');
-        expect(table).toContain('Rerun #1');
+        expect(table).toContain('Rerun #&#8203;1');
         expect(table).toContain('href="https://example.com/late-att2"');
     });
 
@@ -185,9 +187,9 @@ describe('buildSummaryTable', () => {
         ];
         const table = buildSummaryTable(rows);
         expect(table).not.toContain('Original');
-        expect(table).not.toContain('Rerun #1 ');
-        expect(table).not.toContain('Rerun #2 ');
-        expect(table).toContain('Rerun #3');
+        expect(table).not.toContain('Rerun #&#8203;1 ');
+        expect(table).not.toContain('Rerun #&#8203;2 ');
+        expect(table).toContain('Rerun #&#8203;3');
         expect(table).toContain('href="https://example.com/att4"');
     });
 
@@ -209,9 +211,9 @@ describe('buildSummaryTable', () => {
             },
         ];
         const table = buildSummaryTable(rows);
-        expect(table).toContain('Rerun #1');
-        expect(table).not.toContain('Rerun #2');
-        expect(table).toContain('Rerun #3');
+        expect(table).toContain('Rerun #&#8203;1');
+        expect(table).not.toContain('Rerun #&#8203;2');
+        expect(table).toContain('Rerun #&#8203;3');
     });
 
     it('handles rerun columns for notDeployed rows', () => {
