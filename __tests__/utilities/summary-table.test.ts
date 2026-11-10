@@ -234,7 +234,7 @@ describe('buildSummaryTable', () => {
 });
 
 describe('toHtmlTable', () => {
-    it('renders the markdown table as an HTML table with cellpadding', () => {
+    it('renders the markdown table as an HTML table with padding and cell borders', () => {
         const html = toHtmlTable(
             buildSummaryTable([
                 {
@@ -246,7 +246,7 @@ describe('toHtmlTable', () => {
             ]),
         );
 
-        expect(html.startsWith('<table cellpadding="6">')).toBe(true);
+        expect(html.startsWith('<table cellpadding="6" frame="box" rules="all">')).toBe(true);
         expect(html).toContain('<tr><th></th><th>Name</th><th>Duration</th><th>Stats</th><th>Total</th><th>Report</th></tr>');
         expect(html).toContain('<td><b>Unit Tests</b></td><td>5s</td>');
         expect(html).toContain('<td>4</td><td><a href="https://example.com/report">View</a></td></tr>');
