@@ -159,7 +159,7 @@ A [CI workflow](.github/workflows/ci.yml) runs on push to master — validates b
 | [Multi Runner](.github/workflows/test-multi-runner.yml) | Deploys on ubuntu, macos, and windows |
 | [Keep Limit](.github/workflows/test-keep-limit.yml) | Old reports cleaned up when exceeding `keep` |
 | [No History](.github/workflows/test-no-history.yml) | `show_history: false` skips history creation |
-| [PR Comment](.github/workflows/test-pr-comment.yml) | `pr_number` targets a PR without a PR event; repeat deploys edit one comment per prefix |
+| [PR Comment](.github/workflows/test-pr-comment.yml) | `pr_number` targets a PR without a PR event; repeat deploys replace one comment per prefix |
 | [Rerun Detection](.github/workflows/test-rerun.yml) | Deploy for manual `gh run rerun` testing |
 
 
@@ -179,7 +179,7 @@ A [CI workflow](.github/workflows/ci.yml) runs on push to master — validates b
 | `prefix`              | Prefix to uniquely identify test report artifacts. Used for summary page, redirect page, rerun tracking, and summary mode. | `allure-report` | No |
 | `keep`                | Number of test reports to keep alive. Also limits history entries.                              | `10`                | No       |
 | `commit_retention_days` | Keep only the Pages branch commits from the last N calendar days (UTC, today included), so clones of the repo stay small. With `7`, the first deploy of a day drops the commits made 7 days ago; later deploys that day find nothing to drop. Kept commits retain their authors and dates; report files are never touched. Runs after the normal push and rewrites history on GitHub's side via the API (nothing is re-uploaded), only if the branch still points at the commit just pushed — a concurrent deploy is never lost. Only applies to a dedicated Pages branch served from the root — ignored for the default branch or a `/docs` source. Must be a whole number; `0` disables it. | `0` | No |
-| `pr_comment`          | Post report info as a PR comment. Later runs edit the same comment (one per `prefix`, or `report_name` when no prefix) instead of adding another. Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
+| `pr_comment`          | Post report info as a PR comment. Each run posts a new comment, so participants get notified, and deletes the earlier one for the same report (one per `prefix`, or `report_name` when no prefix). Requires `pull_requests: write` and `issues: write`.         | `true`              | No       |
 | `pr_number`           | Pull request to comment on. Defaults to the event's pull request; set it on other events (e.g. `workflow_dispatch`) to comment on a known PR. | — | No |
 | `summary`             | Write a GitHub Actions job summary after deployment. Set to `false` when using a separate summary job. | `true` | No |
 | `prefixes`            | Comma-separated list of prefixes to include in summary mode. If omitted, all prefixes are scanned. | — | No |

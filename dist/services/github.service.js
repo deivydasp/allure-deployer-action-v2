@@ -16,30 +16,29 @@ export class GitHubService {
         const { owner, repo } = github.context.repo;
         try {
             const octokit = github.getOctokit(token);
-            const existing = await withRetry(async () => {
+            const earlier = await withRetry(async () => {
                 const comments = await octokit.paginate(octokit.rest.issues.listComments, {
                     owner,
                     repo,
                     issue_number: prNumber,
                     per_page: 100,
                 });
-                // Only bodies that start with the marker: one merely quoting it is someone else's comment.
-                // Latest one wins if an earlier race ever left two.
-                return comments.filter((c) => c.body?.startsWith(marker)).pop();
+                // Only bodies that start with the marker: one merely quoting it is someone else's comment
+                return comments.filter((c) => c.body?.startsWith(marker));
             }, DEFAULT_RETRY_CONFIG);
-            if (existing) {
-                try {
-                    await withRetry(() => octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body }), DEFAULT_RETRY_CONFIG);
-                    info(`Pull Request comment updated on PR #${prNumber}!`);
-                    return;
-                }
-                catch (e) {
-                    // e.g. the comment was written by another token's user, or deleted meanwhile
-                    warning(`Failed to update existing PR comment ${existing.id}, posting a new one: ${e}`);
-                }
-            }
+            // A new comment (not an edit) so GitHub notifies the PR's participants. Posted before
+            // the old ones are deleted, so a failed post leaves the previous result in place.
             await withRetry(() => octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body }), DEFAULT_RETRY_CONFIG);
             info(`Pull Request comment posted on PR #${prNumber}!`);
+            for (const comment of earlier) {
+                try {
+                    await withRetry(() => octokit.rest.issues.deleteComment({ owner, repo, comment_id: comment.id }), DEFAULT_RETRY_CONFIG);
+                }
+                catch (e) {
+                    // e.g. written by another token's user, or already deleted by a parallel run
+                    warning(`Failed to delete earlier PR comment ${comment.id}: ${e}`);
+                }
+            }
         }
         catch (e) {
             warning(`Failed to update PR: ${e}`);
@@ -54,7 +53,7 @@ export class GitHubService {
         }
     }
 }
-/** Hidden marker identifying this action's comment for one report, so a later run edits it instead of adding another */
+/** Hidden marker identifying this action's comment for one report, so a later run replaces it instead of adding another */
 export function prCommentMarker(commentKey) {
     // `--` would end the HTML comment early
     return `<!-- allure-deployer-action:${commentKey.replace(/-{2,}/g, '-')} -->`;

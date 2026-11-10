@@ -41,7 +41,18 @@ jobs:
           report_name: 'PR Comment Test A'
           pr_number: ${{ steps.issue.outputs.number }}
 
-      - name: Second deploy (prefix A again, should edit the first comment)
+      - name: Record the first comment
+        id: before
+        env:
+          ISSUE: ${{ steps.issue.outputs.number }}
+        run: |
+          id=$(gh api --paginate "repos/${{ github.repository }}/issues/${ISSUE}/comments" \
+            --jq ".[] | select(.body | startswith(\"${MARKER_A}\")) | .id")
+          test -n "$id" || { echo "FAIL: first deploy posted no comment"; exit 1; }
+          echo "First comment for prefix A: $id"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Second deploy (prefix A again, should replace the first comment)
         id: second
         uses: ./
         with:
@@ -59,9 +70,10 @@ jobs:
           report_name: 'PR Comment Test B'
           pr_number: ${{ steps.issue.outputs.number }}
 
-      - name: Verify one comment per prefix, edited in place
+      - name: Verify one fresh comment per prefix
         env:
           ISSUE: ${{ steps.issue.outputs.number }}
+          FIRST_ID: ${{ steps.before.outputs.id }}
           FIRST_URL: ${{ steps.first.outputs.report_url }}
           SECOND_URL: ${{ steps.second.outputs.report_url }}
           THIRD_URL: ${{ steps.third.outputs.report_url }}
@@ -72,7 +84,7 @@ jobs:
 
           fail() { echo "FAIL: $1"; exit 1; }
           test -n "$FIRST_URL" && test -n "$SECOND_URL" && test -n "$THIRD_URL" || fail "a deploy step produced no report_url"
-          [ "$FIRST_URL" != "$SECOND_URL" ] || fail "first and second deploy share a report URL, so the edit cannot be told apart"
+          [ "$FIRST_URL" != "$SECOND_URL" ] || fail "first and second deploy share a report URL, so the replacement cannot be told apart"
 
           a_count=$(jq --arg m "$MARKER_A" '[.[] | select(.body | contains($m))] | length' comments.json)
           b_count=$(jq --arg m "$MARKER_B" '[.[] | select(.body | contains($m))] | length' comments.json)
@@ -91,8 +103,8 @@ jobs:
             echo "SKIP: report URL checks (attempt ${{ github.run_attempt }})"
           fi
 
-          edited=$(jq -r --arg m "$MARKER_A" '.[] | select(.body | contains($m)) | .updated_at > .created_at' comments.json)
-          [ "$edited" = true ] && echo "OK: prefix A comment was edited, not re-posted" || fail "prefix A comment was never edited"
+          a_id=$(jq -r --arg m "$MARKER_A" '.[] | select(.body | contains($m)) | .id' comments.json)
+          [ "$a_id" != "$FIRST_ID" ] && echo "OK: prefix A comment was re-posted and the first one deleted" || fail "prefix A comment was edited, not re-posted"
           echo "=== All checks passed ==="
 
       - name: Close throwaway issue

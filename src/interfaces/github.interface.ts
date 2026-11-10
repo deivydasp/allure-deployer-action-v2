@@ -2,8 +2,8 @@ export interface GithubInterface {
     updateOutput({ name, value }: { name: string; value: string }): Promise<void>;
     updateSummary(message: string): Promise<void>;
     /**
-     * Posts the report comment on a pull request, or edits the earlier one carrying the same
-     * `commentKey`, so repeated runs on one PR keep a single comment per report.
+     * Posts the report comment on a pull request and deletes earlier ones carrying the same
+     * `commentKey`: each run notifies the PR's participants and leaves a single comment per report.
      */
     updatePr({
         message,
